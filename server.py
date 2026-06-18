@@ -447,6 +447,8 @@ class TrajetixHandler(SimpleHTTPRequestHandler):
                 ).fetchall()
             json_response(self, 200, {"audit": [dict(row) for row in rows]})
             return
+        if path.startswith("/ref/"):
+            self.path = "/index.html"
         super().do_GET()
 
     def do_POST(self):

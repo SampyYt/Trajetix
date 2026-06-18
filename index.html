@@ -2562,6 +2562,7 @@
         </div>
 
         <div class="module-grid" id="moduleMetrics"></div>
+        <div id="moduleCustom"></div>
 
         <div class="panel">
           <div class="panel-header">
@@ -2614,6 +2615,19 @@
     const withdrawals = [];
     const suggestions = [];
     const rewardEvents = [];
+    const clients = [];
+    const suppliers = [];
+    const purchases = [];
+    const invoices = [];
+    const referrals = [];
+    const referralProfile = {
+      slug: "",
+      commissionPerShipment: 0.10
+    };
+    const referralAttribution = {
+      ownerEmail: "",
+      code: ""
+    };
 
     const ecuadorBanks = [
       "Banco Pichincha",
@@ -2728,17 +2742,17 @@
         title: "Directorio de proveedores",
         description: "Contactos, condiciones, tiempos de entrega y proveedores dropshipping.",
         action: "Nuevo proveedor",
-        metrics: [["Proveedores", "8"], ["Dropshipping", "3"], ["Locales", "5"]],
+        metrics: [["Proveedores", "0"], ["Dropshipping", "0"], ["Locales", "0"]],
         columns: ["Proveedor", "Categoria", "Ciudad", "Estado"],
-        rows: [["Importadora Andes", "Tecnologia", "Guayaquil", "Activo"], ["SkinLab EC", "Cosmetica", "Quito", "Activo"], ["Moda Norte", "Ropa", "Ambato", "Pendiente"]]
+        rows: []
       },
       compras: {
         title: "Mis Proveedores / Compras",
         description: "Ordenes de compra, reposicion, recepcion y cuentas por pagar.",
         action: "Nueva compra",
-        metrics: [["Compras abiertas", "4"], ["Por recibir", "$2.340"], ["Restock sugerido", "3"]],
+        metrics: [["Compras abiertas", "0"], ["Por recibir", "$0"], ["Restock sugerido", "0"]],
         columns: ["OC", "Proveedor", "Total", "Estado"],
-        rows: [["OC-2606-01", "SkinLab EC", "$680", "Por recibir"], ["OC-2606-02", "Importadora Andes", "$1.220", "Aprobada"]]
+        rows: []
       },
       ventas: {
         title: "Mis Clientes / Ventas",
@@ -2776,9 +2790,9 @@
         title: "Facturacion",
         description: "Facturas, notas de credito, cobros y documentos tributarios.",
         action: "Nueva factura",
-        metrics: [["Facturado mes", "$12.900"], ["Pendiente", "$980"], ["Documentos", "36"]],
+        metrics: [["Facturado mes", "$0"], ["Pendiente", "$0"], ["Documentos", "0"]],
         columns: ["Documento", "Cliente", "Total", "Estado"],
-        rows: [["FAC-001-00045", "Tienda Natura EC", "$480", "Emitida"], ["FAC-001-00046", "Consumidor final", "$72", "Pagada"]]
+        rows: []
       },
       "mis-puntos": {
         title: "Mis Puntos",
@@ -2789,12 +2803,12 @@
         rows: []
       },
       referidos: {
-        title: "Referidos",
-        description: "Invita tiendas y gana beneficios por actividad de tus referidos.",
-        action: "Invitar referido",
-        metrics: [["Referidos", "5"], ["Activos", "3"], ["Bonos", "$120"]],
-        columns: ["Referido", "Email", "Estado", "Bono"],
-        rows: [["Tienda Fast EC", "fast@ec.com", "Activo", "$40"], ["Moda Sur", "moda@ec.com", "Pendiente", "$0"]]
+        title: "Mis Referidos",
+        description: "Invita a otros a usar Trajetix y gana $0.10 por cada envio de tu red.",
+        action: "Editar enlace",
+        metrics: [["Total referidos", "0"], ["Convertidos", "0"], ["Envios de mi red", "0"], ["Comisiones ganadas", "$0"]],
+        columns: ["Usuario", "Estado", "Envios", "Comision total", "Desde"],
+        rows: []
       },
       comunidades: {
         title: "Comunidades",
@@ -2944,6 +2958,129 @@
 
     function totalRewardPoints() {
       return rewardEvents.reduce((sum, event) => sum + Number(event.points || 0), 0);
+    }
+
+    function slugify(value) {
+      return String(value || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 32);
+    }
+
+    function ensureReferralSlug() {
+      if (!referralProfile.slug) {
+        const user = currentUser();
+        referralProfile.slug = slugify(company.tradeName || company.legalName || user.name || user.email || "trajetix");
+      }
+      return referralProfile.slug || "trajetix";
+    }
+
+    function referralLink() {
+      const url = new URL(window.location.href);
+      url.search = "";
+      url.hash = "";
+      url.pathname = url.pathname.replace(/[^/]*$/, "");
+      return `${url.origin}${url.pathname}?ref=${encodeURIComponent(ensureReferralSlug())}`;
+    }
+
+    function referralCodeFromLocation() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("ref")) return slugify(params.get("ref"));
+      const match = window.location.pathname.match(/\/ref\/([^/]+)/);
+      return match ? slugify(match[1]) : "";
+    }
+
+    function referralCommissionTotal() {
+      return referrals.reduce((sum, referral) => sum + Number(referral.shipments || 0) * Number(referralProfile.commissionPerShipment || 0.10), 0);
+    }
+
+    function referralShipmentsTotal() {
+      return referrals.reduce((sum, referral) => sum + Number(referral.shipments || 0), 0);
+    }
+
+    function findReferralOwnerEmail(code) {
+      const normalized = slugify(code);
+      if (!normalized) return "";
+      for (const user of users) {
+        try {
+          const saved = JSON.parse(localStorage.getItem(userDataKey(user.email)) || "null");
+          const savedSlug = slugify(saved?.referralProfile?.slug || "");
+          if (savedSlug && savedSlug === normalized) return user.email;
+        } catch (error) {
+          // Ignore malformed user data.
+        }
+      }
+      return "";
+    }
+
+    function addReferralToOwner(ownerEmail, referred) {
+      if (!ownerEmail || ownerEmail.toLowerCase() === String(referred.email || "").toLowerCase()) return;
+      const key = userDataKey(ownerEmail);
+      const saved = JSON.parse(localStorage.getItem(key) || `{"version":${DATA_VERSION}}`);
+      const ownerReferrals = Array.isArray(saved.referrals) ? saved.referrals : [];
+      if (ownerReferrals.some(item => String(item.email || "").toLowerCase() === String(referred.email || "").toLowerCase())) return;
+      ownerReferrals.unshift({
+        name: referred.name,
+        email: referred.email,
+        company: referred.company,
+        status: "Registrado",
+        shipments: 0,
+        createdAt: new Date().toLocaleDateString("es-EC", { day: "2-digit", month: "short", year: "numeric" })
+      });
+      saved.version = DATA_VERSION;
+      saved.referrals = ownerReferrals;
+      saved.referralProfile ||= { slug: "", commissionPerShipment: 0.10 };
+      localStorage.setItem(key, JSON.stringify(saved));
+    }
+
+    function creditReferralShipment() {
+      const ownerEmail = referralAttribution.ownerEmail;
+      if (!ownerEmail || ownerEmail.toLowerCase() === currentUserEmail.toLowerCase()) return;
+      const key = userDataKey(ownerEmail);
+      const saved = JSON.parse(localStorage.getItem(key) || "null");
+      if (!saved) return;
+      const ownerReferrals = Array.isArray(saved.referrals) ? saved.referrals : [];
+      const referred = ownerReferrals.find(item => String(item.email || "").toLowerCase() === currentUserEmail.toLowerCase());
+      if (!referred) return;
+      referred.status = "Activo";
+      referred.shipments = Number(referred.shipments || 0) + 1;
+      saved.referrals = ownerReferrals;
+      localStorage.setItem(key, JSON.stringify(saved));
+    }
+
+    function upsertClient({ name, email = "", phone = "", channel = "POS", amount = 0 }) {
+      const cleanName = String(name || "").trim();
+      if (!cleanName) return;
+      const key = `${cleanName}|${email || phone}`.toLowerCase();
+      let client = clients.find(item => item.key === key || (item.name || "").toLowerCase() === cleanName.toLowerCase());
+      if (!client) {
+        client = {
+          key,
+          name: cleanName,
+          email,
+          phone,
+          channel,
+          sales: 0,
+          total: 0,
+          status: "Activo",
+          createdAt: new Date().toLocaleDateString("es-EC", { day: "2-digit", month: "short", year: "numeric" })
+        };
+        clients.unshift(client);
+      }
+      client.channel = channel || client.channel;
+      client.phone = phone || client.phone;
+      client.email = email || client.email;
+      client.sales = Number(client.sales || 0) + (amount ? 1 : 0);
+      client.total = Number(client.total || 0) + Number(amount || 0);
+    }
+
+    function invoiceTotal(status = "") {
+      return invoices
+        .filter(invoice => !status || invoice.status === status)
+        .reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
     }
 
     function ensureUserIds() {
@@ -3334,6 +3471,15 @@
       couriers.length = 0;
       suggestions.length = 0;
       rewardEvents.length = 0;
+      clients.length = 0;
+      suppliers.length = 0;
+      purchases.length = 0;
+      invoices.length = 0;
+      referrals.length = 0;
+      referralProfile.slug = "";
+      referralProfile.commissionPerShipment = 0.10;
+      referralAttribution.ownerEmail = "";
+      referralAttribution.code = "";
     }
 
     function loadUserData(email) {
@@ -3355,6 +3501,13 @@
         replaceList(couriers, saved.couriers);
         replaceList(suggestions, saved.suggestions);
         replaceList(rewardEvents, saved.rewardEvents);
+        replaceList(clients, saved.clients);
+        replaceList(suppliers, saved.suppliers);
+        replaceList(purchases, saved.purchases);
+        replaceList(invoices, saved.invoices);
+        replaceList(referrals, saved.referrals);
+        Object.assign(referralProfile, saved.referralProfile || {});
+        Object.assign(referralAttribution, saved.referralAttribution || {});
       } catch (error) {
         localStorage.removeItem(userDataKey(email));
       }
@@ -3376,7 +3529,14 @@
         stores,
         couriers,
         suggestions,
-        rewardEvents
+        rewardEvents,
+        clients,
+        suppliers,
+        purchases,
+        invoices,
+        referrals,
+        referralProfile,
+        referralAttribution
       }));
     }
 
@@ -4268,6 +4428,56 @@
           rows: stockMovements.map(item => [item.createdAt, item.sku, item.product, item.type, item.qty, item.before, item.after, item.note])
         };
       }
+      if (moduleId === "proveedores") {
+        return {
+          ...modulePages.proveedores,
+          metrics: [
+            ["Proveedores", suppliers.length],
+            ["Dropshipping", suppliers.filter(item => item.category === "Dropshipping").length],
+            ["Locales", suppliers.filter(item => item.category !== "Dropshipping").length]
+          ],
+          rows: suppliers.map(item => [item.name, item.category, item.city, item.status])
+        };
+      }
+      if (moduleId === "compras") {
+        const open = purchases.filter(item => item.status !== "Recibida");
+        return {
+          ...modulePages.compras,
+          metrics: [
+            ["Compras abiertas", open.length],
+            ["Por recibir", money(open.reduce((sum, item) => sum + Number(item.total || 0), 0))],
+            ["Restock sugerido", inventory.filter(item => item.available <= item.min).length]
+          ],
+          rows: purchases.map(item => [item.code, item.supplier, money(item.total), item.status])
+        };
+      }
+      if (moduleId === "ventas") {
+        return {
+          ...modulePages.ventas,
+          metrics: [
+            ["Clientes", clients.length],
+            ["Ventas mes", money(clients.reduce((sum, client) => sum + Number(client.total || 0), 0))],
+            ["Cuentas por cobrar", "$0"]
+          ],
+          rows: clients.map(item => [
+            `<strong>${item.name}</strong><div class="muted">${item.phone || item.email || "Sin contacto"}</div>`,
+            item.channel,
+            money(item.total || 0),
+            `<span class="badge ${statusClass[item.status] || "ok"}">${item.status}</span>`
+          ])
+        };
+      }
+      if (moduleId === "facturacion") {
+        return {
+          ...modulePages.facturacion,
+          metrics: [
+            ["Facturado mes", money(invoiceTotal())],
+            ["Pendiente", money(invoiceTotal("Pendiente"))],
+            ["Documentos", invoices.length]
+          ],
+          rows: invoices.map(item => [item.code, item.client, money(item.total), item.status])
+        };
+      }
       if (moduleId === "mis-puntos") {
         const points = totalRewardPoints();
         return {
@@ -4285,6 +4495,45 @@
             ["Implementadas", suggestions.filter(item => item.status === "Implementada").length]
           ],
           rows: suggestions.map(item => [item.idea, item.module, item.priority, item.status])
+        };
+      }
+      if (moduleId === "referidos") {
+        const commission = Number(referralProfile.commissionPerShipment || 0.10);
+        return {
+          ...modulePages.referidos,
+          description: `Comparte tu enlace y recibe ${money(commission)} por cada envio que haga un usuario invitado.`,
+          metrics: [
+            ["Total referidos", referrals.length],
+            ["Convertidos", referrals.filter(item => item.status === "Activo").length],
+            ["Envios de mi red", referralShipmentsTotal()],
+            ["Comisiones ganadas", money(referralCommissionTotal())]
+          ],
+          customHtml: `
+            <div class="panel" style="margin-bottom:14px">
+              <div class="panel-header">
+                <div>
+                  <h2>Tu enlace de referido</h2>
+                  <p>Cuando alguien se registre con este enlace y haga envios, recibiras comision automaticamente.</p>
+                </div>
+              </div>
+              <div class="form">
+                <label>Enlace<input id="referralLinkInput" value="${referralLink()}" readonly></label>
+                <div class="actions" style="justify-content:flex-start">
+                  <button class="btn primary" type="button" id="copyReferralLink">Copiar enlace</button>
+                  <button class="btn" type="button" id="editReferralSlug">Modificar enlace</button>
+                  <span class="badge ok">Comision: ${money(commission)} por envio</span>
+                </div>
+                <div class="muted">Codigo actual: ${ensureReferralSlug()}</div>
+              </div>
+            </div>
+          `,
+          rows: referrals.map(item => [
+            `<strong>${item.name}</strong><div class="muted">${item.company || item.email}</div>`,
+            `<span class="badge ${item.status === "Activo" ? "ok" : "neutral"}">${item.status}</span>`,
+            item.shipments || 0,
+            money(Number(item.shipments || 0) * commission),
+            item.createdAt
+          ])
         };
       }
       if (moduleId === "comunidades") {
@@ -4332,6 +4581,8 @@
           <strong>${value}</strong>
         </div>
       `).join("");
+      const custom = document.querySelector("#moduleCustom");
+      if (custom) custom.innerHTML = module.customHtml || "";
       document.querySelector("#moduleTableTitle").textContent = module.title;
       document.querySelector("#moduleTableDescription").textContent = module.description;
       document.querySelector("#moduleTableHead").innerHTML = `<tr>${module.columns.map(column => `<th>${column}</th>`).join("")}</tr>`;
@@ -4340,11 +4591,12 @@
       `).join("") : `<tr><td colspan="${module.columns.length}" class="muted">Sin registros todavia.</td></tr>`;
       setView("modulePage");
       document.querySelectorAll(".nav button").forEach(button => button.classList.toggle("active", button.dataset.module === moduleId));
+      if (moduleId === "referidos") saveUserData();
     }
 
     function refreshInventoryModules() {
       const activeModule = document.querySelector("#moduleAction")?.dataset.moduleAction;
-      if (!document.querySelector("#modulePage")?.classList.contains("hidden") && ["productos", "stock", "kardex", "mis-puntos", "sugerencias", "suscripcion", "reporte-ventas", "comunidades", "canjes"].includes(activeModule)) {
+      if (!document.querySelector("#modulePage")?.classList.contains("hidden") && ["productos", "stock", "kardex", "proveedores", "compras", "ventas", "facturacion", "mis-puntos", "sugerencias", "referidos", "suscripcion", "reporte-ventas", "comunidades", "canjes"].includes(activeModule)) {
         renderModulePage(activeModule);
       }
     }
@@ -4384,6 +4636,62 @@
         renderModulePage("kardex");
         return;
       }
+      if (action === "proveedores") {
+        const name = prompt("Nombre del proveedor:");
+        if (!name || !name.trim()) return;
+        const category = prompt("Categoria:", "Local") || "Local";
+        const city = prompt("Ciudad:", "Quito") || "Quito";
+        suppliers.unshift({
+          name: name.trim(),
+          category: category.trim() || "Local",
+          city: city.trim() || "Quito",
+          status: "Activo",
+          createdAt: new Date().toLocaleDateString("es-EC", { day: "2-digit", month: "short", year: "numeric" })
+        });
+        renderModulePage("proveedores");
+        saveState();
+        return;
+      }
+      if (action === "compras") {
+        const supplier = prompt("Proveedor:", suppliers[0]?.name || "");
+        if (!supplier || !supplier.trim()) return;
+        const total = Number(prompt("Total de compra:", "0") || 0);
+        purchases.unshift({
+          code: `OC-${String(Date.now()).slice(-8)}`,
+          supplier: supplier.trim(),
+          total: Math.max(0, total),
+          status: "Por recibir",
+          createdAt: new Date().toLocaleDateString("es-EC", { day: "2-digit", month: "short", year: "numeric" })
+        });
+        renderModulePage("compras");
+        saveState();
+        return;
+      }
+      if (action === "ventas") {
+        const name = prompt("Nombre del cliente:");
+        if (!name || !name.trim()) return;
+        const phone = prompt("Telefono del cliente:", "") || "";
+        upsertClient({ name, phone, channel: "Manual", amount: 0 });
+        renderModulePage("ventas");
+        saveState();
+        return;
+      }
+      if (action === "facturacion") {
+        const client = prompt("Cliente:", clients[0]?.name || "");
+        if (!client || !client.trim()) return;
+        const total = Number(prompt("Total de factura:", "0") || 0);
+        invoices.unshift({
+          code: `FAC-${String(Date.now()).slice(-8)}`,
+          client: client.trim(),
+          total: Math.max(0, total),
+          status: "Emitida",
+          createdAt: new Date().toLocaleDateString("es-EC", { day: "2-digit", month: "short", year: "numeric" })
+        });
+        upsertClient({ name: client, channel: "Facturacion", amount: Math.max(0, total) });
+        renderModulePage("facturacion");
+        saveState();
+        return;
+      }
       if (action === "sugerencias") {
         const idea = prompt("Escribe tu sugerencia para Trajetix:");
         if (!idea || !idea.trim()) return;
@@ -4399,9 +4707,36 @@
         saveState();
         return;
       }
+      if (action === "referidos") {
+        const nextSlug = slugify(prompt("Escribe tu nuevo codigo de referido:", ensureReferralSlug()) || "");
+        if (!nextSlug) return;
+        referralProfile.slug = nextSlug;
+        renderModulePage("referidos");
+        saveState();
+        return;
+      }
       if (action === "suscripcion") {
         renderModulePage("suscripcion");
         return;
+      }
+    });
+
+    document.querySelector("#modulePage").addEventListener("click", async event => {
+      if (event.target.closest("#copyReferralLink")) {
+        const copied = await copyText(referralLink());
+        event.target.closest("#copyReferralLink").textContent = copied ? "Enlace copiado" : "Copiar manual";
+        setTimeout(() => {
+          const button = document.querySelector("#copyReferralLink");
+          if (button) button.textContent = "Copiar enlace";
+        }, 1400);
+        return;
+      }
+      if (event.target.closest("#editReferralSlug")) {
+        const nextSlug = slugify(prompt("Escribe tu nuevo codigo de referido:", ensureReferralSlug()) || "");
+        if (!nextSlug) return;
+        referralProfile.slug = nextSlug;
+        renderModulePage("referidos");
+        saveState();
       }
     });
 
@@ -4531,10 +4866,19 @@
       company.legalName = data.company;
       company.tradeName = data.company;
       resetOperationalData();
+      const referralCode = referralCodeFromLocation();
+      const referralOwner = findReferralOwnerEmail(referralCode);
+      if (referralOwner) {
+        referralAttribution.ownerEmail = referralOwner;
+        referralAttribution.code = referralCode;
+        addReferralToOwner(referralOwner, { name: data.name, email: data.email, company: data.company });
+      }
       syncForm("companyForm", company);
       renderCompanySummary();
       renderUsers();
       refreshOperationalViews();
+      currentUserEmail = data.email;
+      saveUserData();
       enterApp(data.email, "integrations", true);
     });
 
@@ -4920,7 +5264,9 @@
         createdAt: new Date().toLocaleDateString("es-EC", { day: "2-digit", month: "short", year: "numeric" })
       };
       orders.unshift(order);
+      upsertClient({ name: order.customer, phone: order.phone, channel: "Envios", amount: Number(order.amount || 0) });
       awardReward("first-guide", "Primera guia creada", 100);
+      creditReferralShipment();
       if (backendOnline && authToken) {
         apiFetch("/api/orders", { method: "POST", body: JSON.stringify(order) }).catch(error => console.warn(error.message));
       }
@@ -5047,6 +5393,7 @@
         }
       });
       sales.unshift(sale);
+      upsertClient({ name: sale.customer, channel: sale.delivery || "POS", amount: Number(sale.total || 0) });
       if (backendOnline && authToken) {
         apiFetch("/api/sales", { method: "POST", body: JSON.stringify(sale) }).catch(error => console.warn(error.message));
         sale.lines.forEach(line => {
@@ -5070,6 +5417,7 @@
         };
         orders.unshift(posOrder);
         awardReward("first-guide", "Primera guia creada", 100);
+        creditReferralShipment();
         if (backendOnline && authToken) {
           apiFetch("/api/orders", { method: "POST", body: JSON.stringify(posOrder) }).catch(error => console.warn(error.message));
         }
