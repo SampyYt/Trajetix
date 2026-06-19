@@ -921,6 +921,22 @@
       gap: 8px;
     }
 
+    .origin-destination-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .form-box {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: #fff;
+      display: grid;
+      gap: 12px;
+    }
+
     .profile-hero {
       display: grid;
       grid-template-columns: auto 1fr auto;
@@ -1317,6 +1333,7 @@
       .dashboard-row,
       .module-grid,
       .shipment-choice-grid,
+      .origin-destination-grid,
       .auth-screen {
         grid-template-columns: 1fr;
       }
@@ -1577,7 +1594,7 @@
           <button class="btn primary" id="syncStores">Sincronizar tiendas</button>
         </div>
 
-        <div class="split">
+        <div>
           <div class="panel">
             <div class="panel-header">
               <div>
@@ -1934,50 +1951,56 @@
             </div>
             <form class="form" id="orderForm">
               <div class="shipment-step-section" data-shipment-step="0">
-                <h3>Remitente (origen)</h3>
-                <div class="sender-options">
-                  <label class="sender-option">
-                    <input type="radio" name="originMode" value="quick" checked>
-                    <span><strong>Envio rapido</strong>Ingresa los datos manualmente, sin bodega.</span>
-                  </label>
-                  <label class="sender-option">
-                    <input type="radio" name="originMode" value="warehouse">
-                    <span><strong>Mis bodegas</strong>Despacha desde una bodega registrada.</span>
-                  </label>
-                  <label class="sender-option">
-                    <input type="radio" name="originMode" value="fulfillment">
-                    <span><strong>Fulfillment</strong>Bodega Trajetix o FF con contrato activo.</span>
-                  </label>
-                  <label class="sender-option">
-                    <input type="radio" name="originMode" value="dropshipping">
-                    <span><strong>Dropshipping</strong>Bodega o proveedor vinculado.</span>
-                  </label>
-                </div>
-                <label>Bodega remitente
-                  <select name="senderWarehouse" id="senderWarehouse"></select>
-                </label>
-                <div class="two">
-                  <label>Nombre / razon social remitente<input required name="senderName" id="senderName" placeholder="Nombre del remitente"></label>
-                  <label>Telefono remitente<input required name="senderPhone" id="senderPhone" placeholder="0999999999"></label>
-                </div>
-                <div class="two">
-                  <label>Cedula/RUC remitente<input name="senderId" id="senderId" placeholder="Cedula o RUC"></label>
-                  <label>Ciudad/Canton origen<select name="senderCity" id="senderCity"></select></label>
-                </div>
-                <label>Direccion origen<input required name="senderAddress" id="senderAddress" placeholder="Direccion de retiro"></label>
+                <div class="origin-destination-grid">
+                  <div class="form-box">
+                    <h3>Remitente (origen)</h3>
+                    <div class="sender-options">
+                      <label class="sender-option">
+                        <input type="radio" name="originMode" value="quick" checked>
+                        <span><strong>Envio rapido</strong>Ingresa los datos manualmente, sin bodega.</span>
+                      </label>
+                      <label class="sender-option">
+                        <input type="radio" name="originMode" value="warehouse">
+                        <span><strong>Mis bodegas</strong>Despacha desde una bodega registrada.</span>
+                      </label>
+                      <label class="sender-option">
+                        <input type="radio" name="originMode" value="fulfillment">
+                        <span><strong>Fulfillment</strong>Bodega Trajetix o FF con contrato activo.</span>
+                      </label>
+                      <label class="sender-option">
+                        <input type="radio" name="originMode" value="dropshipping">
+                        <span><strong>Dropshipping</strong>Bodega o proveedor vinculado.</span>
+                      </label>
+                    </div>
+                    <label>Bodega remitente
+                      <select name="senderWarehouse" id="senderWarehouse"></select>
+                    </label>
+                    <div class="two">
+                      <label>Nombre / razon social remitente<input required name="senderName" id="senderName" placeholder="Nombre del remitente"></label>
+                      <label>Telefono remitente<input required name="senderPhone" id="senderPhone" placeholder="0999999999"></label>
+                    </div>
+                    <div class="two">
+                      <label>Cedula/RUC remitente<input name="senderId" id="senderId" placeholder="Cedula o RUC"></label>
+                      <label>Ciudad/Canton origen<select name="senderCity" id="senderCity"></select></label>
+                    </div>
+                    <label>Direccion origen<input required name="senderAddress" id="senderAddress" placeholder="Direccion de retiro"></label>
+                  </div>
 
-                <h3>Destinatario</h3>
-                <div class="two">
-                  <label>Nombre y apellido<input required name="customer" placeholder="Juan Perez"></label>
-                  <label>Telefono / WhatsApp<input required name="phone" placeholder="0991234567"></label>
+                  <div class="form-box">
+                    <h3>Destinatario</h3>
+                    <div class="two">
+                      <label>Nombre y apellido<input required name="customer" placeholder="Juan Perez"></label>
+                      <label>Telefono / WhatsApp<input required name="phone" placeholder="0991234567"></label>
+                    </div>
+                    <div class="two">
+                      <label>Cedula / RUC cliente<input required name="customerId" placeholder="Cedula o RUC del cliente"></label>
+                      <label>Ciudad / Canton destino<select required name="city" id="destinationCity"></select></label>
+                    </div>
+                    <label>Sector destino<select name="sector" id="destinationSector"></select></label>
+                    <label>Direccion exacta<textarea required name="address" placeholder="Av. Principal N123 y Calle Secundaria"></textarea></label>
+                    <label>Referencia<input name="reference" placeholder="Casa azul, frente al parque..."></label>
+                  </div>
                 </div>
-                <div class="two">
-                  <label>Cedula / RUC cliente<input required name="customerId" placeholder="Cedula o RUC del cliente"></label>
-                  <label>Ciudad / Canton destino<select required name="city" id="destinationCity"></select></label>
-                </div>
-                <label>Sector destino<select name="sector" id="destinationSector"></select></label>
-                <label>Direccion exacta<textarea required name="address" placeholder="Av. Principal N123 y Calle Secundaria"></textarea></label>
-                <label>Referencia<input name="reference" placeholder="Casa azul, frente al parque..."></label>
                 <div class="shipment-step-actions">
                   <span></span>
                   <button class="btn primary" type="button" data-shipment-next>Siguiente: Productos</button>
@@ -2060,16 +2083,6 @@
                 </div>
               </div>
             </form>
-          </div>
-
-          <div class="panel">
-            <div class="panel-header">
-              <div>
-                <h2>Fulfillment pipeline</h2>
-                <p>Picking, packing, despacho y confirmacion.</p>
-              </div>
-            </div>
-            <div class="kanban" id="fulfillmentBoard"></div>
           </div>
         </div>
       </section>
@@ -4500,8 +4513,10 @@
     }
 
     function renderBoard() {
+      const board = document.querySelector("#fulfillmentBoard");
+      if (!board) return;
       const lanes = ["Picking", "Empaque", "En ruta", "Incidencia"];
-      document.querySelector("#fulfillmentBoard").innerHTML = lanes.map(lane => `
+      board.innerHTML = lanes.map(lane => `
         <div class="lane">
           <h3>${lane}</h3>
           ${orders.filter(order => order.status === lane).map(order => `
