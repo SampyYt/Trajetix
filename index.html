@@ -865,6 +865,62 @@
       font-size: 12px;
     }
 
+    .shipment-step-section {
+      display: grid;
+      gap: 14px;
+    }
+
+    .shipment-step-section.hidden {
+      display: none !important;
+    }
+
+    .shipment-choice-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .shipment-choice,
+    .carrier-option {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: #fff;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      cursor: pointer;
+    }
+
+    .shipment-choice:has(input:checked),
+    .carrier-option:has(input:checked) {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px var(--brand-3);
+    }
+
+    .shipment-choice input,
+    .carrier-option input {
+      width: auto;
+      margin-top: 3px;
+    }
+
+    .shipment-step-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+
+    .shipment-summary-box {
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: var(--surface-2);
+      display: grid;
+      gap: 8px;
+    }
+
     .profile-hero {
       display: grid;
       grid-template-columns: auto 1fr auto;
@@ -1260,6 +1316,7 @@
       .kpi-grid,
       .dashboard-row,
       .module-grid,
+      .shipment-choice-grid,
       .auth-screen {
         grid-template-columns: 1fr;
       }
@@ -1870,77 +1927,138 @@
               </div>
             </div>
             <div class="shipment-steps">
-              <span class="active">Origen y destino</span>
-              <span>Productos</span>
-              <span>Transportadora</span>
-              <span>Resumen</span>
+              <span class="active" data-shipment-step-label="0">Origen y destino</span>
+              <span data-shipment-step-label="1">Productos</span>
+              <span data-shipment-step-label="2">Transportadora</span>
+              <span data-shipment-step-label="3">Resumen</span>
             </div>
             <form class="form" id="orderForm">
-              <h3>Remitente (origen)</h3>
-              <div class="sender-options">
-                <label class="sender-option">
-                  <input type="radio" name="originMode" value="quick" checked>
-                  <span><strong>Envio rapido</strong>Ingreso manual de los datos del remitente, sin usar bodega.</span>
+              <div class="shipment-step-section" data-shipment-step="0">
+                <h3>Remitente (origen)</h3>
+                <div class="sender-options">
+                  <label class="sender-option">
+                    <input type="radio" name="originMode" value="quick" checked>
+                    <span><strong>Envio rapido</strong>Ingresa los datos manualmente, sin bodega.</span>
+                  </label>
+                  <label class="sender-option">
+                    <input type="radio" name="originMode" value="warehouse">
+                    <span><strong>Mis bodegas</strong>Despacha desde una bodega registrada.</span>
+                  </label>
+                  <label class="sender-option">
+                    <input type="radio" name="originMode" value="fulfillment">
+                    <span><strong>Fulfillment</strong>Bodega Trajetix o FF con contrato activo.</span>
+                  </label>
+                  <label class="sender-option">
+                    <input type="radio" name="originMode" value="dropshipping">
+                    <span><strong>Dropshipping</strong>Bodega o proveedor vinculado.</span>
+                  </label>
+                </div>
+                <label>Bodega remitente
+                  <select name="senderWarehouse" id="senderWarehouse"></select>
                 </label>
-                <label class="sender-option">
-                  <input type="radio" name="originMode" value="warehouse">
-                  <span><strong>Mis bodegas</strong>Despacha desde tu propia bodega registrada en Trajetix.</span>
-                </label>
-                <label class="sender-option">
-                  <input type="radio" name="originMode" value="fulfillment">
-                  <span><strong>Fulfillment</strong>Bodega Trajetix o FF con contrato activo.</span>
-                </label>
-                <label class="sender-option">
-                  <input type="radio" name="originMode" value="dropshipping">
-                  <span><strong>Dropshipping</strong>Bodega o proveedor vinculado.</span>
-                </label>
-              </div>
-              <label>Bodega remitente
-                <select name="senderWarehouse" id="senderWarehouse"></select>
-              </label>
-              <div class="two">
-                <label>Nombre / razon social remitente<input required name="senderName" id="senderName" placeholder="Nombre del remitente"></label>
-                <label>Telefono remitente<input required name="senderPhone" id="senderPhone" placeholder="0999999999"></label>
-              </div>
-              <div class="two">
-                <label>Cedula/RUC remitente<input name="senderId" id="senderId" placeholder="Cedula o RUC"></label>
-                <label>Ciudad/Canton origen<select name="senderCity" id="senderCity"></select></label>
-              </div>
-              <label>Direccion origen<input required name="senderAddress" id="senderAddress" placeholder="Direccion de retiro"></label>
+                <div class="two">
+                  <label>Nombre / razon social remitente<input required name="senderName" id="senderName" placeholder="Nombre del remitente"></label>
+                  <label>Telefono remitente<input required name="senderPhone" id="senderPhone" placeholder="0999999999"></label>
+                </div>
+                <div class="two">
+                  <label>Cedula/RUC remitente<input name="senderId" id="senderId" placeholder="Cedula o RUC"></label>
+                  <label>Ciudad/Canton origen<select name="senderCity" id="senderCity"></select></label>
+                </div>
+                <label>Direccion origen<input required name="senderAddress" id="senderAddress" placeholder="Direccion de retiro"></label>
 
-              <h3>Destinatario</h3>
-              <div class="two">
-                <label>Nombre y apellido<input required name="customer" placeholder="Juan Perez"></label>
-                <label>Telefono / WhatsApp<input required name="phone" placeholder="0991234567"></label>
-              </div>
-              <div class="two">
-                <label>Cedula / RUC cliente<input required name="customerId" placeholder="Cedula o RUC del cliente"></label>
-                <label>Ciudad / Canton destino<select required name="city" id="destinationCity"></select></label>
-              </div>
-              <div class="two">
+                <h3>Destinatario</h3>
+                <div class="two">
+                  <label>Nombre y apellido<input required name="customer" placeholder="Juan Perez"></label>
+                  <label>Telefono / WhatsApp<input required name="phone" placeholder="0991234567"></label>
+                </div>
+                <div class="two">
+                  <label>Cedula / RUC cliente<input required name="customerId" placeholder="Cedula o RUC del cliente"></label>
+                  <label>Ciudad / Canton destino<select required name="city" id="destinationCity"></select></label>
+                </div>
                 <label>Sector destino<select name="sector" id="destinationSector"></select></label>
-                <label>Metodo de cobro
-                  <select name="payment">
-                    <option>COD</option>
-                    <option>Tarjeta pagada</option>
-                    <option>Transferencia</option>
-                  </select>
-                </label>
+                <label>Direccion exacta<textarea required name="address" placeholder="Av. Principal N123 y Calle Secundaria"></textarea></label>
+                <label>Referencia<input name="reference" placeholder="Casa azul, frente al parque..."></label>
+                <div class="shipment-step-actions">
+                  <span></span>
+                  <button class="btn primary" type="button" data-shipment-next>Siguiente: Productos</button>
+                </div>
               </div>
-              <label>SKU / producto<input required name="sku" placeholder="SKU-001 | Producto vendido"></label>
-              <label>Direccion exacta<textarea required name="address" placeholder="Av. Principal N123 y Calle Secundaria"></textarea></label>
-              <label>Referencia<input name="reference" placeholder="Casa azul, frente al parque..."></label>
-              <div class="two">
-                <label>Valor a cobrar<input name="amount" type="number" min="0" value="0"></label>
-                <label>Prioridad
-                  <select name="priority">
-                    <option>Same day</option>
-                    <option>24 horas</option>
-                    <option>Economico</option>
-                  </select>
-                </label>
+
+              <div class="shipment-step-section hidden" data-shipment-step="1">
+                <h3>Productos</h3>
+                <div class="two">
+                  <label>Producto de mi inventario
+                    <select id="orderInventoryProduct"></select>
+                  </label>
+                  <label>Cantidad<input name="productQty" id="orderProductQty" type="number" min="1" value="1"></label>
+                </div>
+                <label>SKU / producto para la guia<input required name="sku" id="orderSku" placeholder="SKU-001 | Producto vendido"></label>
+                <div class="two">
+                  <label>Peso total kg<input name="weightKg" id="orderWeightKg" type="number" min="0.01" step="0.01" value="1"></label>
+                  <label>Valor declarado / venta<input name="declaredValue" id="orderDeclaredValue" type="number" min="0" step="0.01" value="0"></label>
+                </div>
+                <div class="shipment-summary-box" id="shipmentProductSummary">Agrega productos para continuar.</div>
+                <div class="shipment-step-actions">
+                  <button class="btn" type="button" data-shipment-back>Atras</button>
+                  <button class="btn primary" type="button" data-shipment-next>Siguiente: Transportadora</button>
+                </div>
               </div>
-              <button class="btn primary" type="submit">Siguiente: productos y asignar courier</button>
+
+              <div class="shipment-step-section hidden" data-shipment-step="2">
+                <h3>Transportadora</h3>
+                <div class="panel" style="box-shadow:none">
+                  <div class="panel-header">
+                    <div>
+                      <h2>Parametros</h2>
+                      <p>Elige si la guia va con recaudo contraentrega o sin recaudo.</p>
+                    </div>
+                  </div>
+                  <div class="shipment-choice-grid">
+                    <label class="shipment-choice">
+                      <input type="radio" name="payment" value="COD" checked>
+                      <span><strong>Con recaudo (COD)</strong><br><small>Trajetix registra el valor a cobrar al cliente.</small></span>
+                    </label>
+                    <label class="shipment-choice">
+                      <input type="radio" name="payment" value="Sin recaudo">
+                      <span><strong>Sin recaudo</strong><br><small>El cliente ya pago o no hay cobro contraentrega.</small></span>
+                    </label>
+                  </div>
+                  <div class="two">
+                    <label>Valor a cobrar<input name="amount" id="orderAmount" type="number" min="0" step="0.01" value="0"></label>
+                    <label>Valor declarado / seguro<input name="insuredValue" id="orderInsuredValue" type="number" min="0" step="0.01" value="0"></label>
+                  </div>
+                </div>
+
+                <div class="panel" style="box-shadow:none">
+                  <div class="panel-header">
+                    <div>
+                      <h2>Opciones de envio</h2>
+                      <p>Por ahora solo Trajetix. Servientrega y Laar Courier se conectaran cuando entreguen las APIs.</p>
+                    </div>
+                  </div>
+                  <label class="carrier-option">
+                    <input type="radio" name="priority" value="Trajetix" checked>
+                    <span>
+                      <strong>Trajetix</strong><br>
+                      <small>Guia interna Trajetix - gestion manual/operativa hasta integrar transportadoras.</small>
+                    </span>
+                  </label>
+                </div>
+
+                <div class="shipment-step-actions">
+                  <button class="btn" type="button" data-shipment-back>Atras</button>
+                  <button class="btn primary" type="button" data-shipment-next>Siguiente: Resumen</button>
+                </div>
+              </div>
+
+              <div class="shipment-step-section hidden" data-shipment-step="3">
+                <h3>Resumen</h3>
+                <div class="shipment-summary-box" id="shipmentFinalSummary">Revisa los datos antes de crear la guia.</div>
+                <div class="shipment-step-actions">
+                  <button class="btn" type="button" data-shipment-back>Atras</button>
+                  <button class="btn primary" type="submit">Crear guia Trajetix</button>
+                </div>
+              </div>
             </form>
           </div>
 
@@ -2914,6 +3032,7 @@
     }
 
     function bestCourier(city, priority) {
+      if (priority === "Trajetix") return "Trajetix";
       const activeCouriers = couriers.filter(courier => courier.connected);
       if (activeCouriers.length) {
         const sameDay = activeCouriers.find(courier => priority === "Same day" && String(courier.services || "").toLowerCase().includes("same day"));
@@ -3204,6 +3323,8 @@
         : `<option value="">Sin productos registrados</option>`;
       document.querySelector("#posSku").innerHTML = options;
       document.querySelector("#productionSku").innerHTML = options;
+      const orderProduct = document.querySelector("#orderInventoryProduct");
+      if (orderProduct) orderProduct.innerHTML = options;
     }
 
     function stockStatus(item) {
@@ -4199,6 +4320,76 @@
       if (senderCity && useWarehouse && ecuadorCities.includes(warehouse.city)) senderCity.value = warehouse.city;
     }
 
+    function shipmentFormData() {
+      return Object.fromEntries(new FormData(document.querySelector("#orderForm")).entries());
+    }
+
+    function setShipmentStep(step) {
+      const next = Math.max(0, Math.min(3, Number(step || 0)));
+      document.querySelectorAll("[data-shipment-step]").forEach(section => {
+        section.classList.toggle("hidden", Number(section.dataset.shipmentStep) !== next);
+      });
+      document.querySelectorAll("[data-shipment-step-label]").forEach(label => {
+        label.classList.toggle("active", Number(label.dataset.shipmentStepLabel) === next);
+      });
+      document.querySelector("#orderForm").dataset.currentStep = String(next);
+      updateShipmentSummaries();
+    }
+
+    function updateShipmentProductFromInventory() {
+      const sku = document.querySelector("#orderInventoryProduct")?.value || "";
+      const item = inventory.find(product => product.sku === sku);
+      if (!item) return updateShipmentSummaries();
+      const qty = Math.max(1, Number(document.querySelector("#orderProductQty")?.value || 1));
+      document.querySelector("#orderSku").value = `${item.sku} | ${item.product}`;
+      document.querySelector("#orderWeightKg").value = Number(item.weightKg || 1) * qty;
+      document.querySelector("#orderDeclaredValue").value = Number(item.price || 0) * qty;
+      document.querySelector("#orderInsuredValue").value = Number(item.price || 0) * qty;
+      const payment = document.querySelector("input[name='payment']:checked")?.value || "COD";
+      if (payment === "COD") document.querySelector("#orderAmount").value = Number(item.price || 0) * qty;
+      updateShipmentSummaries();
+    }
+
+    function updateCodMode() {
+      const payment = document.querySelector("input[name='payment']:checked")?.value || "COD";
+      const amount = document.querySelector("#orderAmount");
+      if (!amount) return;
+      if (payment !== "COD") {
+        amount.value = 0;
+        amount.disabled = true;
+      } else {
+        amount.disabled = false;
+        if (Number(amount.value || 0) <= 0) amount.value = document.querySelector("#orderDeclaredValue")?.value || 0;
+      }
+      updateShipmentSummaries();
+    }
+
+    function updateShipmentSummaries() {
+      const data = shipmentFormData();
+      const payment = data.payment || "COD";
+      const amount = payment === "COD" ? Number(data.amount || 0) : 0;
+      const weight = Number(data.weightKg || 0);
+      const productSummary = document.querySelector("#shipmentProductSummary");
+      if (productSummary) {
+        productSummary.innerHTML = `
+          <strong>${data.sku || "Producto pendiente"}</strong>
+          <span>Peso total: ${weight.toFixed(2)} kg</span>
+          <span>Valor declarado: ${money(data.declaredValue || 0)}</span>
+        `;
+      }
+      const finalSummary = document.querySelector("#shipmentFinalSummary");
+      if (finalSummary) {
+        finalSummary.innerHTML = `
+          <strong>${data.customer || "Cliente pendiente"} - ${data.city || "Ciudad pendiente"}</strong>
+          <span>Origen: ${data.senderCity || "Origen pendiente"} / ${data.senderAddress || "Direccion pendiente"}</span>
+          <span>Destino: ${data.address || "Direccion pendiente"}</span>
+          <span>Producto: ${data.sku || "Producto pendiente"} (${weight.toFixed(2)} kg)</span>
+          <span>Transportadora: Trajetix</span>
+          <span>Modalidad: ${payment === "COD" ? `Con recaudo ${money(amount)}` : "Sin recaudo"}</span>
+        `;
+      }
+    }
+
     function renderInventory() {
       document.querySelector("#inventoryTable").innerHTML = inventory.length ? inventory.map(item => {
         const status = stockStatus(item);
@@ -4604,6 +4795,12 @@
     function setView(viewId) {
       document.querySelectorAll(".view").forEach(view => view.classList.toggle("hidden", view.id !== viewId));
       document.querySelectorAll(".nav button").forEach(button => button.classList.toggle("active", button.dataset.view === viewId && !button.dataset.module));
+      if (viewId === "newShipment") {
+        renderProductOptions();
+        setShipmentStep(0);
+        updateShipmentProductFromInventory();
+        updateCodMode();
+      }
     }
 
     document.querySelectorAll("[data-view], [data-open]").forEach(button => {
@@ -4892,6 +5089,26 @@
     document.querySelector("#senderWarehouse").addEventListener("change", applySenderMode);
     document.querySelectorAll("input[name='originMode']").forEach(input => {
       input.addEventListener("change", applySenderMode);
+    });
+    document.querySelector("#orderForm").addEventListener("click", event => {
+      if (event.target.closest("[data-shipment-next]")) {
+        const current = Number(document.querySelector("#orderForm").dataset.currentStep || 0);
+        setShipmentStep(current + 1);
+      }
+      if (event.target.closest("[data-shipment-back]")) {
+        const current = Number(document.querySelector("#orderForm").dataset.currentStep || 0);
+        setShipmentStep(current - 1);
+      }
+    });
+    ["orderInventoryProduct", "orderProductQty"].forEach(id => {
+      document.querySelector(`#${id}`)?.addEventListener("input", updateShipmentProductFromInventory);
+      document.querySelector(`#${id}`)?.addEventListener("change", updateShipmentProductFromInventory);
+    });
+    ["orderSku", "orderWeightKg", "orderDeclaredValue", "orderInsuredValue", "orderAmount"].forEach(id => {
+      document.querySelector(`#${id}`)?.addEventListener("input", updateShipmentSummaries);
+    });
+    document.querySelectorAll("input[name='payment']").forEach(input => {
+      input.addEventListener("change", updateCodMode);
     });
 
     document.querySelector("#ordersTable").addEventListener("click", async event => {
@@ -5238,6 +5455,8 @@
     document.querySelector("#orderForm").addEventListener("submit", event => {
       event.preventDefault();
       const data = Object.fromEntries(new FormData(event.currentTarget).entries());
+      const paymentMode = data.payment === "COD" ? "COD" : "Sin recaudo";
+      const collectAmount = paymentMode === "COD" ? Number(data.amount || 0) : 0;
       const order = {
         guide: nextGuide(),
         customer: data.customer,
@@ -5254,12 +5473,16 @@
         senderId: data.senderId,
         senderCity: data.senderCity,
         senderAddress: data.senderAddress,
-        courier: bestCourier(data.city, data.priority),
-        priority: data.priority,
+        courier: "Trajetix",
+        priority: data.priority || "Trajetix",
         status: "Picking",
-        amount: Number(data.amount),
-        payment: data.payment,
+        amount: collectAmount,
+        payment: paymentMode,
         sku: data.sku.split("|")[0].trim(),
+        productDetail: data.sku,
+        weightKg: Number(data.weightKg || 0),
+        declaredValue: Number(data.declaredValue || 0),
+        insuredValue: Number(data.insuredValue || 0),
         createdTs: Date.now(),
         createdAt: new Date().toLocaleDateString("es-EC", { day: "2-digit", month: "short", year: "numeric" })
       };
