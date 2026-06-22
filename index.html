@@ -937,6 +937,65 @@
       gap: 12px;
     }
 
+    #newShipment {
+      min-height: calc(100vh - 44px);
+    }
+
+    .new-shipment-shell {
+      width: 100%;
+    }
+
+    .new-shipment-panel {
+      min-height: calc(100vh - 140px);
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .new-shipment-panel > .panel-header {
+      padding: 22px 24px 8px;
+      border-bottom: 0;
+    }
+
+    .new-shipment-panel .shipment-steps {
+      padding: 0 24px 16px;
+      margin-bottom: 0;
+    }
+
+    .new-shipment-panel #orderForm {
+      padding: 0 24px 24px;
+      min-width: 0;
+    }
+
+    .shipment-step-section[data-shipment-step="0"] .origin-destination-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 18px;
+      min-height: calc(100vh - 285px);
+      width: 100%;
+      min-width: 0;
+    }
+
+    .shipment-step-section[data-shipment-step="0"] .form-box {
+      min-height: calc(100vh - 315px);
+      padding: 18px;
+      min-width: 0;
+      overflow: visible;
+    }
+
+    .shipment-step-section[data-shipment-step="0"] .two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .shipment-step-section[data-shipment-step="0"] .shipment-step-actions {
+      padding-top: 2px;
+    }
+
+    .shipment-step-section[data-shipment-step="0"] input,
+    .shipment-step-section[data-shipment-step="0"] select,
+    .shipment-step-section[data-shipment-step="0"] textarea {
+      min-width: 0;
+      width: 100%;
+    }
+
     .profile-hero {
       display: grid;
       grid-template-columns: auto 1fr auto;
@@ -1293,6 +1352,10 @@
       .tracking-links {
         display: none;
       }
+
+      .shipment-step-section[data-shipment-step="0"] .origin-destination-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     @media (max-width: 680px) {
@@ -1594,8 +1657,8 @@
           <button class="btn primary" id="syncStores">Sincronizar tiendas</button>
         </div>
 
-        <div>
-          <div class="panel">
+        <div class="new-shipment-shell">
+          <div class="panel new-shipment-panel">
             <div class="panel-header">
               <div>
                 <h2>Tiendas conectables</h2>
@@ -1949,7 +2012,7 @@
               <span data-shipment-step-label="2">Transportadora</span>
               <span data-shipment-step-label="3">Resumen</span>
             </div>
-            <form class="form" id="orderForm">
+            <form class="form" id="orderForm" novalidate>
               <div class="shipment-step-section" data-shipment-step="0">
                 <div class="origin-destination-grid">
                   <div class="form-box">
@@ -1993,7 +2056,7 @@
                       <label>Telefono / WhatsApp<input required name="phone" placeholder="0991234567"></label>
                     </div>
                     <div class="two">
-                      <label>Cedula / RUC cliente<input required name="customerId" placeholder="Cedula o RUC del cliente"></label>
+                      <label>Cedula / RUC cliente<input name="customerId" placeholder="Opcional"></label>
                       <label>Ciudad / Canton destino<select required name="city" id="destinationCity"></select></label>
                     </div>
                     <label>Sector destino<select name="sector" id="destinationSector"></select></label>
@@ -3983,7 +4046,7 @@
     }
 
     function logoUrl() {
-      return `${window.location.origin}${window.location.pathname.replace(/\/[^/]*$/, "/")}trajetix-logo.jpeg`;
+      return new URL("trajetix-logo.jpeg", window.location.href).href;
     }
 
     function labelHtml(order) {
@@ -4401,6 +4464,34 @@
           <span>Modalidad: ${payment === "COD" ? `Con recaudo ${money(amount)}` : "Sin recaudo"}</span>
         `;
       }
+    }
+
+    function validateShipmentData(data) {
+      const checks = [
+        { step: 0, field: "senderName", label: "nombre del remitente" },
+        { step: 0, field: "senderPhone", label: "telefono del remitente" },
+        { step: 0, field: "senderAddress", label: "direccion de origen" },
+        { step: 0, field: "customer", label: "nombre del destinatario" },
+        { step: 0, field: "phone", label: "telefono del destinatario" },
+        { step: 0, field: "city", label: "ciudad de destino" },
+        { step: 0, field: "address", label: "direccion exacta del destinatario" },
+        { step: 1, field: "sku", label: "producto o SKU" }
+      ];
+      const missing = checks.find(item => !String(data[item.field] || "").trim());
+      if (missing) {
+        setShipmentStep(missing.step);
+        const field = document.querySelector(`#orderForm [name="${missing.field}"]`);
+        if (field) field.focus();
+        alert(`Completa ${missing.label} para crear la guia.`);
+        return false;
+      }
+      if ((data.payment || "COD") === "COD" && Number(data.amount || 0) <= 0) {
+        setShipmentStep(2);
+        document.querySelector("#orderAmount")?.focus();
+        alert("Para una guia con recaudo COD, ingresa el valor a cobrar.");
+        return false;
+      }
+      return true;
     }
 
     function renderInventory() {
@@ -5470,6 +5561,7 @@
     document.querySelector("#orderForm").addEventListener("submit", event => {
       event.preventDefault();
       const data = Object.fromEntries(new FormData(event.currentTarget).entries());
+      if (!validateShipmentData(data)) return;
       const paymentMode = data.payment === "COD" ? "COD" : "Sin recaudo";
       const collectAmount = paymentMode === "COD" ? Number(data.amount || 0) : 0;
       const order = {
@@ -5515,6 +5607,7 @@
       setView("orders");
       refreshInventoryModules();
       saveState();
+      printShippingLabel(order);
     });
 
     document.querySelector("#createOrder").addEventListener("click", () => {
