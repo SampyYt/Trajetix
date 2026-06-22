@@ -4002,7 +4002,8 @@
       }
     }
 
-    function printableBase(title, body) {
+    function printableBase(title, body, pageType = "label") {
+      const isManifest = pageType === "manifest";
       return `
         <!doctype html>
         <html>
@@ -4011,7 +4012,7 @@
           <title>${title}</title>
           <style>
             * { box-sizing: border-box; }
-            @page { size: 4in 6in; margin: 0; }
+            @page { size: ${isManifest ? "A4 portrait" : "4in 6in"}; margin: 0; }
             body { font-family: Arial, sans-serif; color: #111; margin: 0; background:#fff; }
             .label { width: 4in; height: 6in; border: 2px solid #111; padding: 0.12in; page-break-after: always; overflow: hidden; }
             .brand { display:grid; grid-template-columns: 0.88in 1fr; gap:0.09in; align-items:center; border-bottom:2px solid #111; padding-bottom:0.07in; margin-bottom:0.08in; }
@@ -4020,7 +4021,7 @@
             .brand span { font-size: 10px; color:#444; }
             .guide { font-size: 26px; font-weight: 900; letter-spacing: 1px; margin: 0.06in 0; text-align:center; border:2px solid #111; padding:0.06in; }
             .barcode { height: 0.42in; margin: 0.06in 0 0.08in; background: repeating-linear-gradient(90deg, #111 0 2px, #fff 2px 4px, #111 4px 7px, #fff 7px 11px, #111 11px 12px, #fff 12px 15px); }
-            .manifest { width: 100%; border: 2px solid #111; padding: 14px; }
+            .manifest { width: 210mm; min-height: 297mm; border: 2px solid #111; padding: 10mm; page-break-after: always; overflow: hidden; }
             .manifest-title { text-align:center; border:2px solid #111; padding:8px; margin:10px 0; font-size:20px; font-weight:900; letter-spacing:.04em; }
             .grid { display:grid; grid-template-columns:1fr 1fr; gap:0.06in; }
             .grid-3 { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; }
@@ -4035,7 +4036,7 @@
             .manifest th, .manifest td { font-size:11px; padding:6px; }
             .signatures { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:34px; }
             .signature { border-top:1px solid #111; padding-top:8px; text-align:center; font-size:12px; }
-            @media print { body { margin: 0; } .no-print { display:none; } .label { border: 2px solid #111; } }
+            @media print { body { margin: 0; } .no-print { display:none; } .label, .manifest { border: 2px solid #111; } }
           </style>
         </head>
         <body onload="setTimeout(() => window.print(), 300)">
@@ -4140,7 +4141,7 @@
             <div class="signature">Recibido por courier / operador<br>Nombre, firma y cedula</div>
           </div>
         </section>
-      `);
+      `, "manifest");
     }
 
     function openPrintDocument(html) {
