@@ -4455,9 +4455,11 @@
       }
       const finalSummary = document.querySelector("#shipmentFinalSummary");
       if (finalSummary) {
+        const originCity = data.senderCity || company.hub || "Quito";
+        const originAddress = data.senderAddress || company.address || "Direccion de origen de la empresa";
         finalSummary.innerHTML = `
           <strong>${data.customer || "Cliente pendiente"} - ${data.city || "Ciudad pendiente"}</strong>
-          <span>Origen: ${data.senderCity || "Origen pendiente"} / ${data.senderAddress || "Direccion pendiente"}</span>
+          <span>Origen: ${originCity} / ${originAddress}</span>
           <span>Destino: ${data.address || "Direccion pendiente"}</span>
           <span>Producto: ${data.sku || "Producto pendiente"} (${weight.toFixed(2)} kg)</span>
           <span>Transportadora: Trajetix</span>
@@ -4468,9 +4470,6 @@
 
     function validateShipmentData(data) {
       const checks = [
-        { step: 0, field: "senderName", label: "nombre del remitente" },
-        { step: 0, field: "senderPhone", label: "telefono del remitente" },
-        { step: 0, field: "senderAddress", label: "direccion de origen" },
         { step: 0, field: "customer", label: "nombre del destinatario" },
         { step: 0, field: "phone", label: "telefono del destinatario" },
         { step: 0, field: "city", label: "ciudad de destino" },
@@ -5575,11 +5574,11 @@
         reference: data.reference,
         originMode: data.originMode,
         senderWarehouse: data.senderWarehouse,
-        senderName: data.senderName,
-        senderPhone: data.senderPhone,
-        senderId: data.senderId,
-        senderCity: data.senderCity,
-        senderAddress: data.senderAddress,
+        senderName: data.senderName || company.legalName || company.tradeName || "Remitente Trajetix",
+        senderPhone: data.senderPhone || company.phone || "0999999999",
+        senderId: data.senderId || company.taxId || "",
+        senderCity: data.senderCity || company.hub || "Quito",
+        senderAddress: data.senderAddress || company.address || "Direccion de origen de la empresa",
         courier: "Trajetix",
         priority: data.priority || "Trajetix",
         status: "Picking",
