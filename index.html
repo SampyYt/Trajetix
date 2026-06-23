@@ -1098,6 +1098,101 @@
       font-size: 16px;
     }
 
+    .integration-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: flex-start;
+      padding: 18px;
+    }
+
+    .integration-list {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(220px, 1fr));
+      gap: 14px;
+      padding: 0 18px 18px;
+    }
+
+    .integration-card.active {
+      border-color: rgba(234, 28, 45, 0.45);
+      box-shadow: 0 0 0 3px rgba(234, 28, 45, 0.08);
+    }
+
+    .integration-detail-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: flex-start;
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .integration-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 14px 18px 0;
+    }
+
+    .integration-tabs button {
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .integration-tabs button.active {
+      background: #fff;
+      color: var(--text);
+      border-color: var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .integration-tab-body {
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .credential-row,
+    .log-row,
+    .doc-row {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 14px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .secret-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px dashed rgba(234, 28, 45, 0.35);
+      border-radius: 8px;
+      background: rgba(234, 28, 45, 0.05);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      word-break: break-all;
+    }
+
+    .code-block {
+      background: #101828;
+      color: #e5eefc;
+      border-radius: 8px;
+      padding: 14px;
+      overflow: auto;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+
     .report-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(180px, 1fr));
@@ -1391,6 +1486,7 @@
       .pos-grid,
       .production-grid,
       .integration-grid,
+      .integration-list,
       .report-grid,
       .kpi-grid,
       .dashboard-row,
@@ -1651,44 +1747,76 @@
       <section id="integrations" class="view hidden">
         <div class="topbar">
           <div>
-            <h1>Conectar tienda y couriers</h1>
-            <p>Centraliza tus canales e-commerce y activa los mejores operadores de Ecuador desde Trajetix.</p>
+            <h1>Integraciones</h1>
+            <p>Conecta tu tienda o sistema externo con Trajetix. Consulta guias, crea envios y recibe notificaciones en tiempo real.</p>
           </div>
-          <button class="btn primary" id="syncStores">Sincronizar tiendas</button>
+          <button class="btn primary" id="newIntegrationButton" type="button">+ Nueva integracion</button>
         </div>
 
-        <div class="new-shipment-shell">
-          <div class="panel new-shipment-panel">
-            <div class="panel-header">
-              <div>
-                <h2>Tiendas conectables</h2>
-                <p>Importa pedidos, clientes, productos y estados de pago.</p>
-              </div>
+        <div class="panel">
+          <div class="integration-header">
+            <div>
+              <h2>Conexiones activas</h2>
+              <p>Agrega Shopify, WooCommerce, un sistema propio o transportadoras ecuatorianas como Laar y Servientrega.</p>
             </div>
-            <form class="form" id="integrationForm" style="margin-bottom:14px">
-              <div class="two">
-                <label>Tipo
-                  <select name="type">
-                    <option value="store">Tienda</option>
-                    <option value="courier">Courier</option>
-                  </select>
-                </label>
-                <label>Nombre<input required name="name" placeholder="Shopify, WooCommerce, Laar Courier..."></label>
-              </div>
-              <label>Detalle<input required name="detail" placeholder="API key, tienda, cobertura o notas de integracion"></label>
-              <button class="btn primary" type="submit">Crear integracion</button>
-            </form>
-            <div class="integration-grid" id="storeList"></div>
+            <span class="badge ok">API lista</span>
           </div>
+          <div class="integration-list" id="integrationList"></div>
+        </div>
 
+        <div class="new-shipment-shell" style="margin-top:14px">
           <div class="panel">
             <div class="panel-header">
               <div>
-                <h2>Couriers Ecuador</h2>
-                <p>Activa cobertura nacional, same day, COD, recoleccion y tracking.</p>
+                <h2>Nueva integracion</h2>
+                <p>Guarda credenciales iniciales y despues genera API keys, webhooks y revisa logs.</p>
               </div>
             </div>
-            <div class="integration-grid" id="courierMarketplace"></div>
+            <form class="form" id="integrationForm" style="padding:0 14px 14px">
+              <div class="two">
+                <label>Proveedor
+                  <select name="type" required>
+                    <option value="shopify">Shopify</option>
+                    <option value="woocommerce">WooCommerce</option>
+                    <option value="custom">Sistema propio / API</option>
+                    <option value="courier_laar">Laar Courier</option>
+                    <option value="courier_servientrega">Servientrega</option>
+                    <option value="courier_other">Otra transportadora</option>
+                  </select>
+                </label>
+                <label>Nombre visible<input required name="name" placeholder="Mi Shopify, Laar Courier, ERP propio..."></label>
+              </div>
+              <div class="two">
+                <label>Dominio o URL base<input name="baseUrl" placeholder="https://mitienda.myshopify.com"></label>
+                <label>Token externo opcional<input name="accessToken" placeholder="Token privado de Shopify/courier"></label>
+              </div>
+              <div class="two">
+                <label>Secreto de webhook<input name="webhookSecret" placeholder="Secreto para validar notificaciones"></label>
+                <label>Notas<input name="detail" placeholder="Pedidos, tracking, tarifas, COD..."></label>
+              </div>
+              <button class="btn primary" type="submit">Crear integracion</button>
+            </form>
+          </div>
+
+          <div class="panel" id="integrationDetail">
+            <div class="integration-detail-head">
+              <div>
+                <h2 id="integrationTitle">Selecciona una integracion</h2>
+                <p id="integrationSubtitle">Genera credenciales y configura eventos.</p>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px">
+                  <span class="badge neutral" id="integrationTypeBadge">API</span>
+                  <span class="badge neutral" id="integrationStatusBadge">Sin seleccionar</span>
+                </div>
+              </div>
+              <button class="btn danger" id="revokeIntegration" type="button">Revocar integracion</button>
+            </div>
+            <div class="integration-tabs" id="integrationTabs" role="tablist" aria-label="Configuracion de integracion">
+              <button type="button" class="active" data-integration-tab="keys">API Keys</button>
+              <button type="button" data-integration-tab="webhooks">Webhooks</button>
+              <button type="button" data-integration-tab="logs">Logs</button>
+              <button type="button" data-integration-tab="docs">Documentacion</button>
+            </div>
+            <div class="integration-tab-body" id="integrationTabBody"></div>
           </div>
         </div>
       </section>
@@ -2783,6 +2911,10 @@
 
     const stores = [];
 
+    const integrationApiKeys = [];
+    const integrationWebhooks = [];
+    const integrationLogs = [];
+
     const ecuadorCities = [
       "Quito", "Guayaquil", "Cuenca", "Santo Domingo", "Machala", "Duran", "Manta", "Portoviejo", "Loja", "Ambato", "Esmeraldas", "Quevedo", "Riobamba", "Milagro", "Ibarra", "Babahoyo", "Latacunga", "Santa Elena", "La Libertad", "Salinas",
       "Aguarico", "Alausí", "Alfredo Baquerizo Moreno", "Arajuno", "Archidona", "Arenillas", "Atacames", "Atahualpa", "Azogues", "Balao", "Balsas", "Balzar", "Banos de Agua Santa", "Biblián", "Bolivar", "Buena Fe", "Caluma", "Camilo Ponce Enriquez", "Canar", "Carlos Julio Arosemena Tola", "Cascales", "Catamayo", "Cayambe", "Cevallos", "Chaguarpamba", "Chambo", "Chilla", "Chillanes", "Chimbo", "Chinchipe", "Chone", "Chordeleg", "Chunchi", "Colimes", "Coronel Marcelino Mariduena", "Cotacachi", "Cumanda", "Daule", "Deleg", "Echeandia", "El Carmen", "El Chaco", "El Empalme", "El Guabo", "El Pan", "El Pangui", "El Tambo", "Eloy Alfaro", "Flavio Alfaro", "Francisco de Orellana", "General Antonio Elizalde", "Giron", "Gonzalo Pizarro", "Gualaquiza", "Guamote", "Guano", "Guaranda", "Huaquillas", "Isabela", "Jama", "Jaramijo", "Jipijapa", "Junin", "La Concordia", "La Joya de los Sachas", "La Mana", "La Troncal", "Lago Agrio", "Las Lajas", "Las Naves", "Limón Indanza", "Logrono", "Lomas de Sargentillo", "Loreto", "Macara", "Macas", "Mera", "Mejia", "Mira", "Mocache", "Mocha", "Montalvo", "Montecristi", "Montufar", "Morona", "Muisne", "Nabon", "Nangaritza", "Naranjal", "Naranjito", "Olmedo", "Oña", "Otavalo", "Pablo Sexto", "Paján", "Palanda", "Palenque", "Palestina", "Pallatanga", "Paltas", "Paquisha", "Pasaje", "Pastaza", "Patate", "Paute", "Pedernales", "Pedro Carbo", "Pedro Moncayo", "Pedro Vicente Maldonado", "Pelileo", "Penipe", "Pichincha", "Pimampiro", "Pindal", "Pinñas", "Playas", "Portovelo", "Pucara", "Puebloviejo", "Puerto Lopez", "Puerto Quito", "Pujili", "Putumayo", "Puyango", "Quero", "Quijos", "Quilanga", "Quininde", "Rocafuerte", "Ruminahui", "Salcedo", "Samborondon", "San Cristobal", "San Fernando", "San Jacinto de Yaguachi", "San Juan Bosco", "San Lorenzo", "San Miguel", "San Miguel de los Bancos", "San Miguel de Urcuqui", "San Pedro de Huaca", "San Vicente", "Santa Ana", "Santa Clara", "Santa Cruz", "Santa Isabel", "Santa Lucia", "Santa Rosa", "Santiago", "Santiago de Pillaro", "Saraguro", "Saquisili", "Sevilla de Oro", "Shushufindi", "Sigchos", "SigSig", "Sozoranga", "Sucre", "Sucua", "Suscal", "Taisha", "Tena", "Tisaleo", "Tiwintza", "Tosagua", "Tulcan", "Urdaneta", "Valencia", "Ventanas", "Vinces", "Yacuambi", "Yaguachi", "Yantzaza", "Zamora", "Zapotillo", "Zaruma"
@@ -3052,6 +3184,9 @@
     let authToken = localStorage.getItem("trajetixToken") || "";
     let backendOnline = false;
     let selectedDashboardRange = "month";
+    let selectedIntegrationId = "";
+    let selectedIntegrationTab = "keys";
+    let lastGeneratedApiKey = null;
 
     const statusClass = {
       "En ruta": "ok",
@@ -3603,25 +3738,225 @@
       `).join("") || `<tr><td colspan="6" class="muted">Sin pedidos en este periodo.</td></tr>`;
     }
 
-    function renderIntegrations() {
-      document.querySelector("#storeList").innerHTML = stores.length ? stores.map((store, index) => `
-        <div class="integration-card">
-          <strong>${store.name}</strong>
-          <div class="muted">${store.detail}</div>
-          <span class="badge ${store.connected ? "ok" : "neutral"}">${store.connected ? "Conectada" : "Disponible"}</span>
-          <button class="btn ${store.connected ? "" : "primary"}" data-store="${index}">${store.connected ? "Reconfigurar" : "Conectar"}</button>
-        </div>
-      `).join("") : `<div class="warehouse-row"><strong>Sin tiendas integradas</strong><div class="muted">Crea tu primera integracion desde el formulario.</div></div>`;
+    function integrationItems() {
+      return [
+        ...stores.map(item => ({ ...item, bucket: "store" })),
+        ...couriers.map(item => ({ ...item, bucket: "courier" }))
+      ];
+    }
 
-      document.querySelector("#courierMarketplace").innerHTML = couriers.length ? couriers.map((courier, index) => `
-        <div class="integration-card">
-          <strong>${courier.name}</strong>
-          <div class="muted">${courier.sla} - ${courier.coverage}</div>
-          <div class="muted">${courier.services}</div>
-          <span class="badge ${courier.connected ? "ok" : "neutral"}">${courier.connected ? "Activo" : "Disponible"}</span>
-          <button class="btn ${courier.connected ? "" : "primary"}" data-courier="${index}">${courier.connected ? "Configurar tarifas" : "Activar courier"}</button>
-        </div>
-      `).join("") : `<div class="warehouse-row"><strong>Sin couriers integrados</strong><div class="muted">Agrega Laar Courier, Servientrega u otro operador desde tu cuenta.</div></div>`;
+    function findIntegration(id) {
+      return integrationItems().find(item => item.id === id);
+    }
+
+    function providerLabel(type = "") {
+      const labels = {
+        shopify: "Shopify",
+        woocommerce: "WooCommerce",
+        custom: "Sistema propio",
+        courier_laar: "Laar Courier",
+        courier_servientrega: "Servientrega",
+        courier_other: "Transportadora"
+      };
+      return labels[type] || "API";
+    }
+
+    function integrationKind(type = "") {
+      return String(type).startsWith("courier_") ? "Courier Ecuador" : "Tienda / API";
+    }
+
+    function addIntegrationLog(integrationId, event, detail, level = "info") {
+      integrationLogs.unshift({
+        id: `LOG-${Date.now()}-${Math.floor(Math.random() * 999)}`,
+        integrationId,
+        event,
+        detail,
+        level,
+        createdAt: new Date().toISOString()
+      });
+      if (integrationLogs.length > 250) integrationLogs.length = 250;
+    }
+
+    async function syncIntegrationLogs(integrationId) {
+      if (!backendOnline || !authToken || !integrationId) return;
+      try {
+        const payload = await apiFetch(`/api/integration-logs?integration_id=${encodeURIComponent(integrationId)}`);
+        (payload.logs || []).forEach(log => {
+          const id = `DBLOG-${log.id}`;
+          if (integrationLogs.some(item => item.id === id)) return;
+          integrationLogs.unshift({
+            id,
+            integrationId: log.integration_id || integrationId,
+            event: log.event,
+            detail: log.detail || "",
+            level: log.level || "info",
+            createdAt: log.created_at
+          });
+        });
+      } catch (error) {
+        console.warn("No se pudieron sincronizar logs de integracion", error.message);
+      }
+    }
+
+    function renderIntegrations() {
+      const list = document.querySelector("#integrationList");
+      if (!list) return;
+      const items = integrationItems();
+      if (!selectedIntegrationId && items[0]) selectedIntegrationId = items[0].id;
+      if (selectedIntegrationId && !items.some(item => item.id === selectedIntegrationId)) selectedIntegrationId = items[0]?.id || "";
+
+      list.innerHTML = items.length ? items.map(item => `
+        <button class="integration-card ${item.id === selectedIntegrationId ? "active" : ""}" type="button" data-integration-id="${item.id}" style="text-align:left">
+          <strong>${item.name}</strong>
+          <div class="muted">${providerLabel(item.provider || item.type)} - ${item.baseUrl || item.detail || item.coverage || "Sin URL configurada"}</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap">
+            <span class="badge neutral">${integrationKind(item.provider || item.type)}</span>
+            <span class="badge ${item.connected ? "ok" : "danger"}">${item.connected ? "Activa" : "Revocada"}</span>
+          </div>
+        </button>
+      `).join("") : `
+        <div class="warehouse-row" style="grid-column:1/-1">
+          <strong>No hay integraciones aun</strong>
+          <div class="muted">Crea Shopify, un sistema propio o una transportadora para empezar.</div>
+        </div>`;
+
+      renderIntegrationDetail();
+    }
+
+    function renderIntegrationDetail() {
+      const detail = document.querySelector("#integrationDetail");
+      const integration = findIntegration(selectedIntegrationId);
+      if (!detail || !integration) {
+        if (detail) {
+          document.querySelector("#integrationTitle").textContent = "Selecciona una integracion";
+          document.querySelector("#integrationSubtitle").textContent = "Crea una integracion para generar API keys y webhooks.";
+          document.querySelector("#integrationTypeBadge").textContent = "API";
+          document.querySelector("#integrationStatusBadge").textContent = "Sin seleccionar";
+          document.querySelector("#integrationTabBody").innerHTML = `<div class="warehouse-row"><strong>Sin integracion seleccionada</strong><div class="muted">Usa el formulario para conectar tu primera tienda o courier.</div></div>`;
+        }
+        return;
+      }
+      document.querySelector("#integrationTitle").textContent = integration.name;
+      document.querySelector("#integrationSubtitle").textContent = `${providerLabel(integration.provider || integration.type)} - ${integration.baseUrl || integration.detail || "Configuracion local"}`;
+      document.querySelector("#integrationTypeBadge").textContent = integrationKind(integration.provider || integration.type);
+      document.querySelector("#integrationStatusBadge").textContent = integration.connected ? "activa" : "revocada";
+      document.querySelector("#integrationStatusBadge").className = `badge ${integration.connected ? "ok" : "danger"}`;
+      document.querySelector("#revokeIntegration").disabled = !integration.connected;
+      document.querySelectorAll("[data-integration-tab]").forEach(button => button.classList.toggle("active", button.dataset.integrationTab === selectedIntegrationTab));
+      renderIntegrationTab(integration);
+    }
+
+    function renderIntegrationTab(integration) {
+      const body = document.querySelector("#integrationTabBody");
+      if (!body) return;
+      if (selectedIntegrationTab === "keys") {
+        const keys = integrationApiKeys.filter(key => key.integrationId === integration.id);
+        body.innerHTML = `
+          <div class="panel-header" style="padding:0">
+            <div>
+              <h2>API Keys</h2>
+              <p>Genera claves para que Shopify, tu ERP o un courier consulte tracking y cree guias.</p>
+            </div>
+            <button class="btn primary" type="button" id="generateApiKey">+ Generar Key</button>
+          </div>
+          ${lastGeneratedApiKey?.integrationId === integration.id ? `
+            <div class="secret-line">
+              <strong>Copiala ahora:</strong>
+              <span>${lastGeneratedApiKey.secret}</span>
+              <button class="btn" type="button" data-copy="${lastGeneratedApiKey.secret}">Copiar</button>
+            </div>
+          ` : ""}
+          ${keys.length ? keys.map(key => `
+            <div class="credential-row">
+              <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap">
+                <strong>${key.name}</strong>
+                <span class="badge ${key.status === "Activa" ? "ok" : "danger"}">${key.status}</span>
+              </div>
+              <div class="muted">Prefijo: ${key.prefix}... - Creada: ${new Date(key.createdAt).toLocaleString("es-EC")}</div>
+              <div class="muted">Ultimo uso: ${key.lastUsed || "Sin uso registrado"}</div>
+              <button class="btn danger" type="button" data-revoke-key="${key.id}">Revocar key</button>
+            </div>
+          `).join("") : `<div class="warehouse-row"><strong>No hay API Keys</strong><div class="muted">Genera una para comenzar.</div></div>`}
+        `;
+      }
+      if (selectedIntegrationTab === "webhooks") {
+        const webhooks = integrationWebhooks.filter(webhook => webhook.integrationId === integration.id);
+        body.innerHTML = `
+          <form class="form" id="webhookForm">
+            <div class="two">
+              <label>URL del webhook<input required name="url" placeholder="https://mitienda.com/webhooks/trajetix"></label>
+              <label>Evento
+                <select name="event">
+                  <option value="order.created">order.created</option>
+                  <option value="guide.created">guide.created</option>
+                  <option value="tracking.updated">tracking.updated</option>
+                  <option value="cod.paid">cod.paid</option>
+                </select>
+              </label>
+            </div>
+            <button class="btn primary" type="submit">Guardar webhook</button>
+          </form>
+          ${webhooks.length ? webhooks.map(webhook => `
+            <div class="credential-row">
+              <strong>${webhook.event}</strong>
+              <div class="muted">${webhook.url}</div>
+              <span class="badge ${webhook.active ? "ok" : "neutral"}">${webhook.active ? "Activo" : "Pausado"}</span>
+              <button class="btn" type="button" data-test-webhook="${webhook.id}">Enviar prueba</button>
+            </div>
+          `).join("") : `<div class="warehouse-row"><strong>Sin webhooks</strong><div class="muted">Agrega una URL para recibir eventos de Trajetix.</div></div>`}
+        `;
+      }
+      if (selectedIntegrationTab === "logs") {
+        const logs = integrationLogs.filter(log => log.integrationId === integration.id);
+        body.innerHTML = logs.length ? logs.map(log => `
+          <div class="log-row">
+            <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap">
+              <strong>${log.event}</strong>
+              <span class="badge ${log.level === "error" ? "danger" : log.level === "warn" ? "warn" : "neutral"}">${log.level}</span>
+            </div>
+            <div>${log.detail}</div>
+            <div class="muted">${new Date(log.createdAt).toLocaleString("es-EC")}</div>
+          </div>
+        `).join("") : `<div class="warehouse-row"><strong>Sin logs</strong><div class="muted">Aqui veras conexiones, webhooks, errores y uso de API.</div></div>`;
+      }
+      if (selectedIntegrationTab === "docs") {
+        const baseUrl = `${location.origin}`;
+        body.innerHTML = `
+          <div class="doc-row">
+            <strong>Autenticacion</strong>
+            <div class="muted">Usa el header Authorization con una API key activa.</div>
+            <div class="code-block">Authorization: Bearer tjx_live_xxxxxxxxx</div>
+          </div>
+          <div class="doc-row">
+            <strong>Crear una guia desde Shopify o sistema externo</strong>
+            <div class="code-block">POST ${baseUrl}/api/external/orders
+Content-Type: application/json
+
+{
+  "customer": "Juan Perez",
+  "phone": "0999999999",
+  "city": "Guayaquil",
+  "address": "Av. Principal y Calle 2",
+  "sku": "SKU-001",
+  "payment": "COD",
+  "amount": 25.00
+}</div>
+          </div>
+          <div class="doc-row">
+            <strong>Webhook Shopify orders/create</strong>
+            <div class="muted">Cuando tengas tu app privada o webhook de Shopify, apunta el evento de orden creada a este endpoint.</div>
+            <div class="code-block">POST ${baseUrl}/api/webhooks/shopify/orders</div>
+          </div>
+          <div class="doc-row">
+            <strong>Tracking publico</strong>
+            <div class="code-block">GET ${baseUrl}/api/public-track?guide=TJX-000001</div>
+          </div>
+          <div class="doc-row">
+            <strong>Transportadoras Ecuador</strong>
+            <div class="muted">Para Laar Courier y Servientrega deja guardado URL base, token y secreto. Cuando te entreguen la API, se conecta desde esta misma integracion sin cambiar el flujo de guias.</div>
+          </div>
+        `;
+      }
     }
 
     function saveState() {
@@ -3666,6 +4001,9 @@
       withdrawals.length = 0;
       stores.length = 0;
       couriers.length = 0;
+      integrationApiKeys.length = 0;
+      integrationWebhooks.length = 0;
+      integrationLogs.length = 0;
       suggestions.length = 0;
       rewardEvents.length = 0;
       clients.length = 0;
@@ -3677,6 +4015,9 @@
       referralProfile.commissionPerShipment = 0.10;
       referralAttribution.ownerEmail = "";
       referralAttribution.code = "";
+      selectedIntegrationId = "";
+      selectedIntegrationTab = "keys";
+      lastGeneratedApiKey = null;
     }
 
     function loadUserData(email) {
@@ -3696,6 +4037,21 @@
         replaceList(withdrawals, saved.withdrawals);
         replaceList(stores, saved.stores);
         replaceList(couriers, saved.couriers);
+        stores.forEach((store, index) => {
+          store.id ||= `STORE-${index}-${Date.now()}`;
+          store.provider ||= store.type || "custom";
+          store.type ||= store.provider;
+          store.connected = store.connected !== false;
+        });
+        couriers.forEach((courier, index) => {
+          courier.id ||= `COURIER-${index}-${Date.now()}`;
+          courier.provider ||= courier.type || "courier_other";
+          courier.type ||= courier.provider;
+          courier.connected = courier.connected !== false;
+        });
+        replaceList(integrationApiKeys, saved.integrationApiKeys);
+        replaceList(integrationWebhooks, saved.integrationWebhooks);
+        replaceList(integrationLogs, saved.integrationLogs);
         replaceList(suggestions, saved.suggestions);
         replaceList(rewardEvents, saved.rewardEvents);
         replaceList(clients, saved.clients);
@@ -3725,6 +4081,9 @@
         withdrawals,
         stores,
         couriers,
+        integrationApiKeys,
+        integrationWebhooks,
+        integrationLogs,
         suggestions,
         rewardEvents,
         clients,
@@ -5502,21 +5861,37 @@
       event.preventDefault();
       const data = Object.fromEntries(new FormData(event.currentTarget).entries());
       const name = String(data.name || "").trim();
-      const detail = String(data.detail || "").trim();
-      if (!name || !detail) return;
-      if (data.type === "courier") {
+      const provider = String(data.type || "custom");
+      const detail = String(data.detail || "").trim() || providerLabel(provider);
+      if (!name) return;
+      const integration = {
+        id: `INT-${Date.now()}-${Math.floor(Math.random() * 999)}`,
+        name,
+        provider,
+        type: provider,
+        detail,
+        baseUrl: String(data.baseUrl || "").trim(),
+        accessToken: String(data.accessToken || "").trim(),
+        webhookSecret: String(data.webhookSecret || "").trim(),
+        connected: true,
+        createdAt: new Date().toISOString()
+      };
+      if (provider.startsWith("courier_")) {
         couriers.unshift({
-          name,
+          ...integration,
           sla: "Configurado por usuario",
           score: 100,
           cost: "Tarifa propia",
-          coverage: detail,
+          coverage: detail || "Ecuador",
           services: "COD, tracking y guias",
           connected: true
         });
       } else {
-        stores.unshift({ name, detail, connected: true });
+        stores.unshift(integration);
       }
+      selectedIntegrationId = integration.id;
+      selectedIntegrationTab = "keys";
+      addIntegrationLog(integration.id, "integracion.creada", `${name} quedo lista para configurar credenciales.`);
       event.currentTarget.reset();
       renderIntegrations();
       renderCouriers();
@@ -5524,30 +5899,118 @@
       saveState();
     });
 
-    document.querySelector("#storeList").addEventListener("click", event => {
-      const button = event.target.closest("[data-store]");
+    document.querySelector("#integrationList").addEventListener("click", event => {
+      const button = event.target.closest("[data-integration-id]");
       if (!button) return;
-      stores[Number(button.dataset.store)].connected = true;
+      selectedIntegrationId = button.dataset.integrationId;
+      renderIntegrations();
+    });
+
+    document.querySelector("#integrationTabs").addEventListener("click", async event => {
+      const button = event.target.closest("[data-integration-tab]");
+      if (!button) return;
+      selectedIntegrationTab = button.dataset.integrationTab;
+      if (selectedIntegrationTab === "logs") await syncIntegrationLogs(selectedIntegrationId);
+      renderIntegrationDetail();
+    });
+
+    document.querySelector("#newIntegrationButton").addEventListener("click", () => {
+      document.querySelector("#integrationForm [name='name']").focus();
+    });
+
+    document.querySelector("#revokeIntegration").addEventListener("click", () => {
+      const integration = findIntegration(selectedIntegrationId);
+      if (!integration) return;
+      integration.connected = false;
+      addIntegrationLog(integration.id, "integracion.revocada", "La integracion fue revocada manualmente.", "warn");
       renderIntegrations();
       renderReports();
       saveState();
     });
 
-    document.querySelector("#courierMarketplace").addEventListener("click", event => {
-      const button = event.target.closest("[data-courier]");
-      if (!button) return;
-      couriers[Number(button.dataset.courier)].connected = true;
-      renderIntegrations();
-      renderCouriers();
-      renderReports();
-      saveState();
+    document.querySelector("#integrationTabBody").addEventListener("click", async event => {
+      const copyButton = event.target.closest("[data-copy]");
+      if (copyButton) {
+        await navigator.clipboard?.writeText(copyButton.dataset.copy);
+        copyButton.textContent = "Copiado";
+        return;
+      }
+
+      const generateButton = event.target.closest("#generateApiKey");
+      if (generateButton) {
+        const integration = findIntegration(selectedIntegrationId);
+        if (!integration) return;
+        generateButton.disabled = true;
+        let createdKey = null;
+        if (backendOnline && authToken) {
+          try {
+            createdKey = await apiFetch("/api/integration-keys", {
+              method: "POST",
+              body: JSON.stringify({ integrationId: integration.id, name: integration.name, provider: integration.provider || integration.type })
+            });
+          } catch (error) {
+            addIntegrationLog(integration.id, "api_key.error", error.message, "error");
+          }
+        }
+        const fallbackSecret = `tjx_live_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+        const secret = createdKey?.secret || fallbackSecret;
+        const key = {
+          id: createdKey?.id || `KEY-${Date.now()}`,
+          integrationId: integration.id,
+          name: `${integration.name} key`,
+          prefix: createdKey?.prefix || secret.slice(0, 16),
+          status: "Activa",
+          createdAt: new Date().toISOString(),
+          lastUsed: ""
+        };
+        integrationApiKeys.unshift(key);
+        lastGeneratedApiKey = { integrationId: integration.id, secret };
+        addIntegrationLog(integration.id, "api_key.creada", `Se genero una API key con prefijo ${key.prefix}.`);
+        generateButton.disabled = false;
+        renderIntegrationDetail();
+        saveState();
+        return;
+      }
+
+      const revokeKeyButton = event.target.closest("[data-revoke-key]");
+      if (revokeKeyButton) {
+        const key = integrationApiKeys.find(item => item.id === revokeKeyButton.dataset.revokeKey);
+        if (!key) return;
+        key.status = "Revocada";
+        addIntegrationLog(key.integrationId, "api_key.revocada", `Se revoco la API key ${key.prefix}.`, "warn");
+        renderIntegrationDetail();
+        saveState();
+        return;
+      }
+
+      const testButton = event.target.closest("[data-test-webhook]");
+      if (testButton) {
+        const webhook = integrationWebhooks.find(item => item.id === testButton.dataset.testWebhook);
+        if (!webhook) return;
+        addIntegrationLog(webhook.integrationId, "webhook.prueba", `Evento de prueba enviado a ${webhook.url}.`);
+        renderIntegrationDetail();
+        saveState();
+      }
     });
 
-    document.querySelector("#syncStores").addEventListener("click", () => {
-      const connected = stores.filter(store => store.connected).map(store => store.name).join(", ");
-      document.querySelector("#syncStores").textContent = connected ? "Tiendas sincronizadas" : "Sin tiendas conectadas";
-      setTimeout(() => document.querySelector("#syncStores").textContent = "Sincronizar tiendas", 1400);
-      renderReports();
+    document.querySelector("#integrationTabBody").addEventListener("submit", event => {
+      if (event.target.id !== "webhookForm") return;
+      event.preventDefault();
+      const integration = findIntegration(selectedIntegrationId);
+      if (!integration) return;
+      const data = Object.fromEntries(new FormData(event.target).entries());
+      integrationWebhooks.unshift({
+        id: `WH-${Date.now()}`,
+        integrationId: integration.id,
+        url: String(data.url || "").trim(),
+        event: data.event,
+        active: true,
+        createdAt: new Date().toISOString()
+      });
+      addIntegrationLog(integration.id, "webhook.creado", `Webhook ${data.event} agregado correctamente.`);
+      event.target.reset();
+      renderIntegrationDetail();
+      saveState();
     });
 
     document.querySelector("#saveCompany").addEventListener("click", () => {

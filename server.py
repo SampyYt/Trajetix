@@ -208,6 +208,31 @@ def init_db():
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(user_id) REFERENCES users(id)
             );
+
+            CREATE TABLE IF NOT EXISTS integration_api_keys (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id INTEGER NOT NULL,
+                integration_id TEXT,
+                name TEXT NOT NULL,
+                provider TEXT,
+                prefix TEXT NOT NULL,
+                key_hash TEXT NOT NULL UNIQUE,
+                status TEXT NOT NULL DEFAULT 'Activa',
+                created_at TEXT NOT NULL,
+                last_used_at TEXT,
+                FOREIGN KEY(company_id) REFERENCES companies(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS integration_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id INTEGER NOT NULL,
+                integration_id TEXT,
+                event TEXT NOT NULL,
+                detail TEXT,
+                level TEXT NOT NULL DEFAULT 'info',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(company_id) REFERENCES companies(id)
+            );
             """
         )
 
@@ -393,6 +418,66 @@ def make_courier_guide(courier, order_guide):
     return f"{prefix}-{int(time.time())}-{secrets.randbelow(9000) + 1000}"
 
 
+def hash_api_key(secret):
+    return hashlib.sha256(secret.encode("utf-8")).hexdigest()
+
+
+def authenticate_api_key(handler):
+    auth = handler.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return None
+    digest = hash_api_key(auth[7:].strip())
+    with connect_db() as conn:
+        row = conn.execute(
+            """
+            SELECT id, company_id, integration_id, name, provider
+            FROM integration_api_keys
+            WHERE key_hash = ? AND status = 'Activa'
+            """,
+            (digest,),
+        ).fetchone()
+        if row:
+            conn.execute("UPDATE integration_api_keys SET last_used_at = ? WHERE id = ?", (now(), row["id"]))
+            conn.execute(
+                """
+                INSERT INTO integration_logs (company_id, integration_id, event, detail, level, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (row["company_id"], row["integration_id"], "api_key.usada", f"Uso de API key {row['name']}", "info", now()),
+            )
+            conn.commit()
+        return dict(row) if row else None
+
+
+def make_external_guide():
+    return f"TJX-{int(time.time())}{secrets.randbelow(9000) + 1000}"
+
+
+def normalize_external_order(data):
+    shipping = data.get("shipping_address") or {}
+    customer = data.get("customer") or {}
+    line_items = data.get("line_items") or []
+    first_line = line_items[0] if line_items else {}
+    name = data.get("customer_name") or data.get("customer") or "Cliente externo"
+    if isinstance(name, dict):
+        name = " ".join(filter(None, [customer.get("first_name"), customer.get("last_name")])) or "Cliente externo"
+    return {
+        "guide": data.get("guide") or make_external_guide(),
+        "customer": data.get("customerName") or name or shipping.get("name") or "Cliente externo",
+        "customer_id": data.get("customerId", ""),
+        "phone": data.get("phone") or shipping.get("phone") or customer.get("phone") or "",
+        "city": data.get("city") or shipping.get("city") or "Guayaquil",
+        "sector": data.get("sector", ""),
+        "address": data.get("address") or shipping.get("address1") or "",
+        "reference": data.get("reference") or shipping.get("address2") or "",
+        "courier": data.get("courier") or "Trajetix",
+        "status": data.get("status") or "Picking",
+        "amount": float(data.get("amount") or data.get("total_price") or 0),
+        "payment": data.get("payment") or ("COD" if data.get("amount") or data.get("total_price") else "Sin recaudo"),
+        "sku": data.get("sku") or first_line.get("sku") or first_line.get("title") or "Pedido externo",
+    }
+
+
 class TrajetixHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT), **kwargs)
@@ -447,6 +532,25 @@ class TrajetixHandler(SimpleHTTPRequestHandler):
                 ).fetchall()
             json_response(self, 200, {"audit": [dict(row) for row in rows]})
             return
+        if path == "/api/integration-logs":
+            session = current_session(self)
+            if not session:
+                json_response(self, 401, {"error": "No autenticado"})
+                return
+            integration_id = parse_qs(parsed.query).get("integration_id", [""])[0]
+            with connect_db() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT id, integration_id, event, detail, level, created_at
+                    FROM integration_logs
+                    WHERE company_id = ? AND (? = '' OR integration_id = ?)
+                    ORDER BY id DESC
+                    LIMIT 100
+                    """,
+                    (session["company_id"], integration_id, integration_id),
+                ).fetchall()
+            json_response(self, 200, {"logs": [dict(row) for row in rows]})
+            return
         if path.startswith("/ref/"):
             self.path = "/index.html"
         super().do_GET()
@@ -467,6 +571,12 @@ class TrajetixHandler(SimpleHTTPRequestHandler):
                 self.handle_audit(data)
             elif path == "/api/orders":
                 self.handle_order(data)
+            elif path == "/api/integration-keys":
+                self.handle_integration_key(data)
+            elif path == "/api/external/orders":
+                self.handle_external_order(data, "api.external")
+            elif path == "/api/webhooks/shopify/orders":
+                self.handle_external_order(data, "shopify.orders_create")
             elif path == "/api/warehouses":
                 self.handle_warehouse(data)
             elif path == "/api/products":
@@ -644,6 +754,96 @@ class TrajetixHandler(SimpleHTTPRequestHandler):
             audit(conn, session, "crear_orden", "orders", data)
             conn.commit()
         json_response(self, 201, {"ok": True})
+
+    def handle_integration_key(self, data):
+        session = current_session(self)
+        if not session:
+            json_response(self, 401, {"error": "No autenticado"})
+            return
+        secret = f"tjx_live_{secrets.token_urlsafe(32)}"
+        prefix = secret[:16]
+        with connect_db() as conn:
+            conn.execute(
+                """
+                INSERT INTO integration_api_keys
+                (company_id, integration_id, name, provider, prefix, key_hash, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    session["company_id"],
+                    data.get("integrationId", ""),
+                    data.get("name", "Trajetix API key"),
+                    data.get("provider", ""),
+                    prefix,
+                    hash_api_key(secret),
+                    "Activa",
+                    now(),
+                ),
+            )
+            key_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            conn.execute(
+                """
+                INSERT INTO integration_logs (company_id, integration_id, event, detail, level, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (session["company_id"], data.get("integrationId", ""), "api_key.creada", f"API key creada para {data.get('name', 'integracion')}", "info", now()),
+            )
+            audit(conn, session, "crear_api_key", "integration_api_keys", {"integrationId": data.get("integrationId", ""), "prefix": prefix})
+            conn.commit()
+        json_response(self, 201, {"id": f"KEY-{key_id}", "prefix": prefix, "secret": secret})
+
+    def handle_external_order(self, data, source):
+        api_key = authenticate_api_key(self)
+        if not api_key:
+            json_response(self, 401, {"error": "API key invalida o revocada"})
+            return
+        order = normalize_external_order(data)
+        if not order["customer"] or not order["city"] or not order["address"]:
+            json_response(self, 400, {"error": "Cliente, ciudad y direccion son obligatorios"})
+            return
+        with connect_db() as conn:
+            conn.execute(
+                """
+                INSERT INTO orders
+                (company_id, guide, customer, customer_id, phone, city, sector, address, reference,
+                 origin_mode, sender_warehouse, sender_name, sender_phone, sender_id, sender_city,
+                 sender_address, courier, status, amount, payment, sku, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    api_key["company_id"],
+                    order["guide"],
+                    order["customer"],
+                    order["customer_id"],
+                    order["phone"],
+                    order["city"],
+                    order["sector"],
+                    order["address"],
+                    order["reference"],
+                    source,
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    order["courier"],
+                    order["status"],
+                    order["amount"],
+                    order["payment"],
+                    order["sku"],
+                    now(),
+                ),
+            )
+            conn.execute(
+                """
+                INSERT INTO integration_logs (company_id, integration_id, event, detail, level, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (api_key["company_id"], api_key.get("integration_id", ""), "order.created", f"Guia {order['guide']} creada desde {source}", "info", now()),
+            )
+            conn.commit()
+        json_response(self, 201, {"ok": True, "guide": order["guide"], "tracking_url": f"/#track={order['guide']}"})
 
     def handle_warehouse(self, data):
         session = current_session(self)
