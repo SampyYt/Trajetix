@@ -17,6 +17,21 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "tjx_live"
+      },
+      "TrajetixSession": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "session"
+      },
+      "TrajetixApiKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Trajetix-Key"
+      },
+      "TrajetixApiKeyQuery": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "api_key"
       }
     },
     "schemas": {
@@ -25,6 +40,7 @@
         "required": ["customer", "phone", "city", "address"],
         "properties": {
           "customer": { "type": "string", "example": "Juan Perez" },
+          "externalRef": { "type": "string", "example": "shopify-order-1025" },
           "customerId": { "type": "string", "example": "0912345678" },
           "phone": { "type": "string", "example": "0999999999" },
           "city": { "type": "string", "example": "Guayaquil" },
@@ -51,7 +67,7 @@
     "/api/external/ping": {
       "get": {
         "summary": "Probar API key externa",
-        "security": [{ "TrajetixApiKey": [] }],
+        "security": [{ "TrajetixApiKey": [] }, { "TrajetixApiKeyHeader": [] }, { "TrajetixApiKeyQuery": [] }],
         "responses": {
           "200": { "description": "Conexion activa" },
           "401": { "description": "API key invalida o revocada" }
@@ -61,7 +77,7 @@
     "/api/external/orders": {
       "post": {
         "summary": "Crear guia desde ecommerce o sistema externo",
-        "security": [{ "TrajetixApiKey": [] }],
+        "security": [{ "TrajetixApiKey": [] }, { "TrajetixApiKeyHeader": [] }, { "TrajetixApiKeyQuery": [] }],
         "requestBody": {
           "required": true,
           "content": {
@@ -84,10 +100,21 @@
         }
       }
     },
+    "/api/orders": {
+      "get": {
+        "summary": "Listar guias de la empresa autenticada",
+        "description": "Usado por el dashboard Trajetix para sincronizar pedidos creados desde ecommerce, Shopify o API externa.",
+        "security": [{ "TrajetixSession": [] }],
+        "responses": {
+          "200": { "description": "Listado de guias" },
+          "401": { "description": "Sesion no autenticada" }
+        }
+      }
+    },
     "/api/webhooks/shopify/orders": {
       "post": {
         "summary": "Recibir order creation de Shopify",
-        "security": [{ "TrajetixApiKey": [] }],
+        "security": [{ "TrajetixApiKey": [] }, { "TrajetixApiKeyHeader": [] }, { "TrajetixApiKeyQuery": [] }],
         "requestBody": {
           "required": true,
           "content": {

@@ -104,6 +104,7 @@ def init_db():
                 amount REAL NOT NULL,
                 payment TEXT,
                 sku TEXT,
+                external_ref TEXT,
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(company_id) REFERENCES companies(id)
             );
@@ -250,6 +251,7 @@ def init_db():
             "sender_id": "TEXT",
             "sender_city": "TEXT",
             "sender_address": "TEXT",
+            "external_ref": "TEXT",
         }
         for column, column_type in order_columns.items():
             if column not in existing_order_columns:
@@ -425,8 +427,14 @@ def hash_api_key(secret):
 def authenticate_api_key(handler):
     auth = handler.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
+        api_key = handler.headers.get("X-Trajetix-Key", "")
+        if not api_key:
+            api_key = parse_qs(urlparse(handler.path).query).get("api_key", [""])[0]
+    else:
+        api_key = auth[7:].strip()
+    if not api_key:
         return None
-    digest = hash_api_key(auth[7:].strip())
+    digest = hash_api_key(api_key.strip())
     with connect_db() as conn:
         row = conn.execute(
             """
@@ -453,6 +461,13 @@ def make_external_guide():
     return f"TJX-{int(time.time())}{secrets.randbelow(9000) + 1000}"
 
 
+def to_float(value, default=0):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def normalize_external_order(data):
     shipping = data.get("shipping_address") or {}
     customer = data.get("customer") or {}
@@ -461,6 +476,18 @@ def normalize_external_order(data):
     name = data.get("customer_name") or data.get("customer") or "Cliente externo"
     if isinstance(name, dict):
         name = " ".join(filter(None, [customer.get("first_name"), customer.get("last_name")])) or "Cliente externo"
+    gateway_text = " ".join(
+        str(value or "")
+        for value in [
+            data.get("payment"),
+            data.get("gateway"),
+            data.get("payment_gateway_names"),
+            data.get("financial_status"),
+            data.get("tags"),
+        ]
+    ).lower()
+    is_cod = any(token in gateway_text for token in ["cod", "contraentrega", "contra entrega", "cash on delivery", "efectivo"])
+    collect_amount = to_float(data.get("amount") if data.get("amount") is not None else data.get("total_price"), 0) if is_cod else 0
     return {
         "guide": data.get("guide") or make_external_guide(),
         "customer": data.get("customerName") or name or shipping.get("name") or "Cliente externo",
@@ -472,10 +499,27 @@ def normalize_external_order(data):
         "reference": data.get("reference") or shipping.get("address2") or "",
         "courier": data.get("courier") or "Trajetix",
         "status": data.get("status") or "Picking",
-        "amount": float(data.get("amount") or data.get("total_price") or 0),
-        "payment": data.get("payment") or ("COD" if data.get("amount") or data.get("total_price") else "Sin recaudo"),
+        "amount": collect_amount,
+        "payment": "COD" if is_cod else "Sin recaudo",
         "sku": data.get("sku") or first_line.get("sku") or first_line.get("title") or "Pedido externo",
+        "external_ref": str(data.get("externalRef") or data.get("id") or data.get("order_number") or data.get("name") or "").strip(),
     }
+
+
+def order_payload(row):
+    payload = dict(row)
+    payload["customerId"] = payload.pop("customer_id", "") or ""
+    payload["originMode"] = payload.pop("origin_mode", "") or ""
+    payload["senderWarehouse"] = payload.pop("sender_warehouse", "") or ""
+    payload["senderName"] = payload.pop("sender_name", "") or ""
+    payload["senderPhone"] = payload.pop("sender_phone", "") or ""
+    payload["senderId"] = payload.pop("sender_id", "") or ""
+    payload["senderCity"] = payload.pop("sender_city", "") or ""
+    payload["senderAddress"] = payload.pop("sender_address", "") or ""
+    payload["createdAt"] = payload.pop("created_at", "") or ""
+    payload["courierGuide"] = payload.pop("courier_guide", "") or ""
+    payload["externalRef"] = payload.pop("external_ref", "") or ""
+    return payload
 
 
 class TrajetixHandler(SimpleHTTPRequestHandler):
@@ -544,6 +588,29 @@ class TrajetixHandler(SimpleHTTPRequestHandler):
                     (session["company_id"],),
                 ).fetchall()
             json_response(self, 200, {"audit": [dict(row) for row in rows]})
+            return
+        if path == "/api/orders":
+            session = current_session(self)
+            if not session:
+                json_response(self, 401, {"error": "No autenticado"})
+                return
+            with connect_db() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT o.guide, o.customer, o.customer_id, o.phone, o.city, o.sector,
+                           o.address, o.reference, o.origin_mode, o.sender_warehouse,
+                           o.sender_name, o.sender_phone, o.sender_id, o.sender_city,
+                           o.sender_address, o.courier, o.status, o.amount, o.payment,
+                           o.sku, o.external_ref, o.created_at, c.courier_guide
+                    FROM orders o
+                    LEFT JOIN courier_guides c ON upper(c.order_guide) = upper(o.guide)
+                    WHERE o.company_id = ?
+                    ORDER BY o.id DESC
+                    LIMIT 500
+                    """,
+                    (session["company_id"],),
+                ).fetchall()
+            json_response(self, 200, {"orders": [order_payload(row) for row in rows]})
             return
         if path == "/api/integration-logs":
             session = current_session(self)
@@ -730,18 +797,19 @@ class TrajetixHandler(SimpleHTTPRequestHandler):
         if not session:
             json_response(self, 401, {"error": "No autenticado"})
             return
+        guide = data.get("guide") or make_external_guide()
         with connect_db() as conn:
             conn.execute(
                 """
                 INSERT INTO orders
                 (company_id, guide, customer, customer_id, phone, city, sector, address, reference,
                  origin_mode, sender_warehouse, sender_name, sender_phone, sender_id, sender_city,
-                 sender_address, courier, status, amount, payment, sku, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 sender_address, courier, status, amount, payment, sku, external_ref, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     session["company_id"],
-                    data.get("guide"),
+                    guide,
                     data.get("customer"),
                     data.get("customerId", ""),
                     data.get("phone", ""),
@@ -761,12 +829,13 @@ class TrajetixHandler(SimpleHTTPRequestHandler):
                     float(data.get("amount", 0)),
                     data.get("payment", ""),
                     data.get("sku", ""),
+                    data.get("externalRef", ""),
                     now(),
                 ),
             )
             audit(conn, session, "crear_orden", "orders", data)
             conn.commit()
-        json_response(self, 201, {"ok": True})
+        json_response(self, 201, {"ok": True, "guide": guide})
 
     def handle_integration_key(self, data):
         session = current_session(self)
@@ -811,17 +880,39 @@ class TrajetixHandler(SimpleHTTPRequestHandler):
             json_response(self, 401, {"error": "API key invalida o revocada"})
             return
         order = normalize_external_order(data)
-        if not order["customer"] or not order["city"] or not order["address"]:
-            json_response(self, 400, {"error": "Cliente, ciudad y direccion son obligatorios"})
+        if not order["customer"] or not order["phone"] or not order["city"] or not order["address"]:
+            json_response(self, 400, {"error": "Cliente, telefono, ciudad y direccion son obligatorios"})
             return
         with connect_db() as conn:
+            if order["external_ref"]:
+                existing = conn.execute(
+                    """
+                    SELECT guide
+                    FROM orders
+                    WHERE company_id = ? AND external_ref = ?
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """,
+                    (api_key["company_id"], order["external_ref"]),
+                ).fetchone()
+                if existing:
+                    conn.execute(
+                        """
+                        INSERT INTO integration_logs (company_id, integration_id, event, detail, level, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (api_key["company_id"], api_key.get("integration_id", ""), "order.duplicated", f"Webhook repetido, se devolvio guia existente {existing['guide']}", "warn", now()),
+                    )
+                    conn.commit()
+                    json_response(self, 200, {"ok": True, "guide": existing["guide"], "tracking_url": f"/#track={existing['guide']}", "duplicate": True})
+                    return
             conn.execute(
                 """
                 INSERT INTO orders
                 (company_id, guide, customer, customer_id, phone, city, sector, address, reference,
                  origin_mode, sender_warehouse, sender_name, sender_phone, sender_id, sender_city,
-                 sender_address, courier, status, amount, payment, sku, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 sender_address, courier, status, amount, payment, sku, external_ref, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     api_key["company_id"],
@@ -845,6 +936,7 @@ class TrajetixHandler(SimpleHTTPRequestHandler):
                     order["amount"],
                     order["payment"],
                     order["sku"],
+                    order["external_ref"],
                     now(),
                 ),
             )

@@ -3190,6 +3190,7 @@
 
     const statusClass = {
       "En ruta": "ok",
+      "Entregado": "ok",
       "Picking": "neutral",
       "Empaque": "warn",
       "Incidencia": "danger",
@@ -3210,6 +3211,15 @@
 
     function money(value) {
       return new Intl.NumberFormat("es-EC", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
+    }
+
+    function esc(value = "") {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
     }
 
     async function apiFetch(path, options = {}) {
@@ -3239,6 +3249,80 @@
         });
       } catch (error) {
         console.warn("No se pudo registrar auditoria", error.message);
+      }
+    }
+
+    function parseServerDate(value) {
+      const timestamp = Date.parse(String(value || "").replace(" ", "T"));
+      return Number.isFinite(timestamp) ? timestamp : Date.now();
+    }
+
+    function normalizeServerOrder(order) {
+      const createdTs = parseServerDate(order.createdAt || order.created_at);
+      return {
+        guide: String(order.guide || "").trim(),
+        customer: order.customer || "Cliente ecommerce",
+        customerId: order.customerId || order.customer_id || "",
+        phone: order.phone || "",
+        city: order.city || "",
+        sector: order.sector || "",
+        address: order.address || "",
+        reference: order.reference || "",
+        originMode: order.originMode || order.origin_mode || "api.external",
+        senderWarehouse: order.senderWarehouse || order.sender_warehouse || "",
+        senderName: order.senderName || order.sender_name || "",
+        senderPhone: order.senderPhone || order.sender_phone || "",
+        senderId: order.senderId || order.sender_id || "",
+        senderCity: order.senderCity || order.sender_city || "",
+        senderAddress: order.senderAddress || order.sender_address || "",
+        courier: order.courier || "Trajetix",
+        courierGuide: order.courierGuide || order.courier_guide || "",
+        status: order.status || "Picking",
+        amount: Number(order.amount || 0),
+        payment: order.payment || "Sin recaudo",
+        sku: order.sku || "Pedido ecommerce",
+        externalRef: order.externalRef || order.external_ref || "",
+        productDetail: order.productDetail || order.sku || "Pedido ecommerce",
+        weightKg: Number(order.weightKg || 0),
+        declaredValue: Number(order.declaredValue || order.amount || 0),
+        insuredValue: Number(order.insuredValue || 0),
+        createdTs,
+        createdAt: order.createdAt
+          ? new Date(createdTs).toLocaleDateString("es-EC", { day: "2-digit", month: "short", year: "numeric" })
+          : new Date(createdTs).toLocaleDateString("es-EC", { day: "2-digit", month: "short", year: "numeric" }),
+        source: order.originMode || order.origin_mode || "backend"
+      };
+    }
+
+    function mergeOrder(incoming) {
+      if (!incoming.guide) return false;
+      const existing = orders.find(order => String(order.guide || "").toUpperCase() === incoming.guide.toUpperCase());
+      if (existing) {
+        Object.assign(existing, { ...incoming, productDetail: existing.productDetail || incoming.productDetail, weightKg: existing.weightKg || incoming.weightKg });
+        return false;
+      }
+      orders.unshift(incoming);
+      upsertClient({ name: incoming.customer, phone: incoming.phone, channel: incoming.source || "Ecommerce", amount: Number(incoming.amount || 0) });
+      return true;
+    }
+
+    async function syncServerOrders() {
+      if (!backendOnline || !authToken) return;
+      try {
+        const payload = await apiFetch("/api/orders");
+        let added = 0;
+        (payload.orders || []).forEach(order => {
+          if (mergeOrder(normalizeServerOrder(order))) added += 1;
+        });
+        if (added) {
+          renderOrders();
+          renderTracking();
+          renderBoard();
+          renderReports();
+          saveUserData();
+        }
+      } catch (error) {
+        console.warn("No se pudieron sincronizar ordenes del servidor", error.message);
       }
     }
 
@@ -3488,12 +3572,13 @@
       document.querySelector("#registerMessage").textContent = "";
     }
 
-    function enterApp(userEmail, startView = "dashboard", remember = true) {
+    async function enterApp(userEmail, startView = "dashboard", remember = true) {
       currentUserEmail = userEmail;
       sessionActive = remember;
       if (remember && authToken) localStorage.setItem("trajetixToken", authToken);
       if (!remember) localStorage.removeItem("trajetixToken");
       loadUserData(userEmail);
+      await syncServerOrders();
       document.querySelector("#authScreen").classList.add("hidden");
       document.querySelector("#appShell").classList.remove("hidden");
       renderTenant();
@@ -3922,6 +4007,7 @@
       if (selectedIntegrationTab === "docs") {
         const baseUrl = `${location.origin}`;
         const orderPayload = `{
+  "externalRef": "shopify-order-1025",
   "customer": "Juan Perez",
   "phone": "0999999999",
   "city": "Guayaquil",
@@ -3966,9 +4052,10 @@ ${orderPayload}</div>
           </div>
           <div class="doc-row">
             <strong>Webhook Shopify orders/create</strong>
-            <div class="muted">En Shopify ve a Settings > Notifications > Webhooks, crea el evento Order creation y apunta al endpoint. Usa la API Key Trajetix como Bearer token en tu middleware o app privada.</div>
+            <div class="muted">En Shopify ve a Settings > Notifications > Webhooks, crea el evento Order creation y apunta al endpoint. Si Shopify no te deja enviar headers, agrega tu API key como parametro api_key en la URL.</div>
             <div class="code-block">POST ${baseUrl}/api/webhooks/shopify/orders</div>
             <button class="btn" type="button" data-copy="${baseUrl}/api/webhooks/shopify/orders">Copiar URL Shopify</button>
+            <button class="btn" type="button" data-copy="${baseUrl}/api/webhooks/shopify/orders?api_key=TU_API_KEY_TRAJETIX">Copiar URL con key</button>
           </div>
           <div class="doc-row">
             <strong>Tracking publico</strong>
@@ -4184,29 +4271,29 @@ ${orderPayload}</div>
 
       document.querySelector("#ordersTable").innerHTML = filtered.length ? filtered.map(order => `
         <tr>
-          <td><input type="checkbox" class="order-select" value="${order.guide}" aria-label="Seleccionar ${order.guide}"></td>
-          <td><strong>${order.guide}</strong><div class="muted">${order.payment}</div></td>
-          <td>${order.customer}<div class="muted">${order.customerId || "Sin cedula"} - ${order.phone || "Sin telefono"}</div></td>
-          <td>${order.city}<div class="muted">${order.sector || "Sin sector"}</div></td>
-          <td>${order.courier}</td>
+          <td><input type="checkbox" class="order-select" value="${esc(order.guide)}" aria-label="Seleccionar ${esc(order.guide)}"></td>
+          <td><strong>${esc(order.guide)}</strong><div class="muted">${esc(order.payment)}</div></td>
+          <td>${esc(order.customer)}<div class="muted">${esc(order.customerId || "Sin cedula")} - ${esc(order.phone || "Sin telefono")}</div></td>
+          <td>${esc(order.city)}<div class="muted">${esc(order.sector || "Sin sector")}</div></td>
+          <td>${esc(order.courier)}</td>
           <td>
-            <select class="select" data-status-guide="${order.guide}" aria-label="Cambiar estado de ${order.guide}">
+            <select class="select" data-status-guide="${esc(order.guide)}" aria-label="Cambiar estado de ${esc(order.guide)}">
               ${["Picking", "Empaque", "En ruta", "Entregado", "Incidencia"].map(option => `<option ${order.status === option ? "selected" : ""}>${option}</option>`).join("")}
             </select>
           </td>
           <td>${money(order.amount)}</td>
           <td>${order.courierGuide
-            ? `<span class="badge ok">${order.courierGuide}</span>`
+            ? `<span class="badge ok">${esc(order.courierGuide)}</span>`
             : canCreateCourierGuide(order.courier)
-              ? `<button class="btn" data-create-guide="${order.guide}">Crear guia</button>`
+              ? `<button class="btn" data-create-guide="${esc(order.guide)}">Crear guia</button>`
               : `<span class="badge neutral">No disponible</span>`}
           </td>
           <td>
             <div class="actions">
-              <button class="btn" data-track-guide="${order.guide}">Rastrear</button>
-              <button class="btn" data-copy-tracking="${order.guide}">Copiar link</button>
-              <button class="btn" data-print-label="${order.guide}">Etiqueta</button>
-              <button class="btn" data-manifest-guide="${order.guide}">Manifiesto</button>
+              <button class="btn" data-track-guide="${esc(order.guide)}">Rastrear</button>
+              <button class="btn" data-copy-tracking="${esc(order.guide)}">Copiar link</button>
+              <button class="btn" data-print-label="${esc(order.guide)}">Etiqueta</button>
+              <button class="btn" data-manifest-guide="${esc(order.guide)}">Manifiesto</button>
             </div>
           </td>
         </tr>
@@ -4239,10 +4326,10 @@ ${orderPayload}</div>
       }
       return `
         <div class="warehouse-row">
-          <strong>${order.guide} - ${order.status}</strong>
-          <div class="muted">${order.customer} / ${order.customerId || "Sin cedula"} / ${order.phone || "Sin telefono"}</div>
-          <div class="muted">${order.city}${order.sector ? ` - ${order.sector}` : ""} / ${order.address || "Sin direccion"}</div>
-          <div class="muted">Courier: ${order.courier} ${order.courierGuide ? `/ Guia courier: ${order.courierGuide}` : "/ Guia courier pendiente"}</div>
+          <strong>${esc(order.guide)} - ${esc(order.status)}</strong>
+          <div class="muted">${esc(order.customer)} / ${esc(order.customerId || "Sin cedula")} / ${esc(order.phone || "Sin telefono")}</div>
+          <div class="muted">${esc(order.city)}${order.sector ? ` - ${esc(order.sector)}` : ""} / ${esc(order.address || "Sin direccion")}</div>
+          <div class="muted">Courier: ${esc(order.courier)} ${order.courierGuide ? `/ Guia courier: ${esc(order.courierGuide)}` : "/ Guia courier pendiente"}</div>
         </div>
         ${trackingTimeline(order)}
       `;
@@ -4281,10 +4368,10 @@ ${orderPayload}</div>
       }
       return `
         <div class="warehouse-row">
-          <strong>${order.guide} - ${order.status}</strong>
-          <div class="muted">Cliente: ${order.customer}</div>
-          <div class="muted">Destino: ${order.city}${order.sector ? ` - ${order.sector}` : ""}</div>
-          <div class="muted">Courier: ${order.courier}${order.courierGuide ? ` / ${order.courierGuide}` : ""}</div>
+          <strong>${esc(order.guide)} - ${esc(order.status)}</strong>
+          <div class="muted">Cliente: ${esc(order.customer)}</div>
+          <div class="muted">Destino: ${esc(order.city)}${order.sector ? ` - ${esc(order.sector)}` : ""}</div>
+          <div class="muted">Courier: ${esc(order.courier)}${order.courierGuide ? ` / ${esc(order.courierGuide)}` : ""}</div>
         </div>
         ${trackingTimeline(order)}
         <div class="status-note">Esta informacion fue compartida por la tienda mediante Trajetix para dar seguridad sobre el despacho.</div>
@@ -4381,11 +4468,11 @@ ${orderPayload}</div>
       if (trackingTable) {
         trackingTable.innerHTML = orders.length ? orders.map(item => `
           <tr>
-            <td><strong>${item.guide}</strong><div class="muted">${item.courierGuide || "Courier pendiente"}</div></td>
-            <td>${item.customer}</td>
-            <td>${item.city}<div class="muted">${item.sector || "Sin sector"}</div></td>
-            <td><span class="badge ${statusClass[item.status] || "neutral"}">${item.status}</span></td>
-            <td>${item.courier}</td>
+            <td><strong>${esc(item.guide)}</strong><div class="muted">${esc(item.courierGuide || "Courier pendiente")}</div></td>
+            <td>${esc(item.customer)}</td>
+            <td>${esc(item.city)}<div class="muted">${esc(item.sector || "Sin sector")}</div></td>
+            <td><span class="badge ${statusClass[item.status] || "neutral"}">${esc(item.status)}</span></td>
+            <td>${esc(item.courier)}</td>
           </tr>
         `).join("") : `<tr><td colspan="5" class="muted">Aun no tienes guias generadas.</td></tr>`;
       }
@@ -5509,7 +5596,7 @@ ${orderPayload}</div>
             localUser.phone ||= serverUser.phone || "";
           }
           currentUserEmail = serverUser.email;
-          enterApp(serverUser.email, "dashboard", true);
+          await enterApp(serverUser.email, "dashboard", true);
           return;
         } catch (error) {
           document.querySelector("#loginMessage").textContent = error.message;
@@ -5521,7 +5608,7 @@ ${orderPayload}</div>
         document.querySelector("#loginMessage").textContent = "Email o contrasena incorrectos. Prueba admin@trajetix.ec / trajetix123.";
         return;
       }
-      enterApp(user.email, "dashboard", true);
+      await enterApp(user.email, "dashboard", true);
     });
 
     document.querySelector("#registerForm").addEventListener("submit", async event => {
@@ -5572,7 +5659,7 @@ ${orderPayload}</div>
       refreshOperationalViews();
       currentUserEmail = data.email;
       saveUserData();
-      enterApp(data.email, "integrations", true);
+      await enterApp(data.email, "integrations", true);
     });
 
     document.querySelector("#logoutButton").addEventListener("click", showLogin);
@@ -6374,6 +6461,7 @@ ${orderPayload}</div>
     async function bootstrap() {
       await checkBackend();
       loadState();
+      if (sessionActive && currentUserEmail) await syncServerOrders();
       const publicGuide = publicGuideFromLocation();
       if (shouldShowPublicTracking()) {
         await showPublicTracking(publicGuide);
