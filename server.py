@@ -653,6 +653,8 @@ class TrajetixHandler(SimpleHTTPRequestHandler):
                 self.handle_order(data)
             elif path == "/api/integration-keys":
                 self.handle_integration_key(data)
+            elif path == "/api/integration-delete":
+                self.handle_integration_delete(data)
             elif path == "/api/external/orders":
                 self.handle_external_order(data, "api.external")
             elif path == "/api/webhooks/shopify/orders":
@@ -873,6 +875,35 @@ class TrajetixHandler(SimpleHTTPRequestHandler):
             audit(conn, session, "crear_api_key", "integration_api_keys", {"integrationId": data.get("integrationId", ""), "prefix": prefix})
             conn.commit()
         json_response(self, 201, {"id": f"KEY-{key_id}", "prefix": prefix, "secret": secret})
+
+    def handle_integration_delete(self, data):
+        session = current_session(self)
+        if not session:
+            json_response(self, 401, {"error": "No autenticado"})
+            return
+        integration_id = data.get("integrationId", "")
+        if not integration_id:
+            json_response(self, 400, {"error": "IntegrationId es obligatorio"})
+            return
+        with connect_db() as conn:
+            conn.execute(
+                """
+                UPDATE integration_api_keys
+                SET status = 'Revocada'
+                WHERE company_id = ? AND integration_id = ?
+                """,
+                (session["company_id"], integration_id),
+            )
+            conn.execute(
+                """
+                INSERT INTO integration_logs (company_id, integration_id, event, detail, level, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (session["company_id"], integration_id, "integracion.eliminada", "Integracion eliminada y API keys revocadas", "warn", now()),
+            )
+            audit(conn, session, "eliminar_integracion", "integrations", {"integrationId": integration_id})
+            conn.commit()
+        json_response(self, 200, {"ok": True})
 
     def handle_external_order(self, data, source):
         api_key = authenticate_api_key(self)

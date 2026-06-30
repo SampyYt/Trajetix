@@ -1808,7 +1808,10 @@
                   <span class="badge neutral" id="integrationStatusBadge">Sin seleccionar</span>
                 </div>
               </div>
-              <button class="btn danger" id="revokeIntegration" type="button">Revocar integracion</button>
+              <div class="actions">
+                <button class="btn danger" id="revokeIntegration" type="button">Revocar integracion</button>
+                <button class="btn danger" id="deleteIntegration" type="button">Eliminar integracion</button>
+              </div>
             </div>
             <div class="integration-tabs" id="integrationTabs" role="tablist" aria-label="Configuracion de integracion">
               <button type="button" class="active" data-integration-tab="keys">API Keys</button>
@@ -3834,6 +3837,25 @@
       return integrationItems().find(item => item.id === id);
     }
 
+    function removeFromListByIntegrationId(list, integrationId) {
+      for (let index = list.length - 1; index >= 0; index -= 1) {
+        if (list[index].integrationId === integrationId) list.splice(index, 1);
+      }
+    }
+
+    function deleteIntegrationById(integrationId) {
+      const storeIndex = stores.findIndex(item => item.id === integrationId);
+      if (storeIndex >= 0) stores.splice(storeIndex, 1);
+      const courierIndex = couriers.findIndex(item => item.id === integrationId);
+      if (courierIndex >= 0) couriers.splice(courierIndex, 1);
+      removeFromListByIntegrationId(integrationApiKeys, integrationId);
+      removeFromListByIntegrationId(integrationWebhooks, integrationId);
+      removeFromListByIntegrationId(integrationLogs, integrationId);
+      if (lastGeneratedApiKey?.integrationId === integrationId) lastGeneratedApiKey = null;
+      selectedIntegrationId = integrationItems()[0]?.id || "";
+      selectedIntegrationTab = "keys";
+    }
+
     function providerLabel(type = "") {
       const labels = {
         shopify: "Shopify",
@@ -3917,6 +3939,8 @@
           document.querySelector("#integrationSubtitle").textContent = "Crea una integracion para generar API keys y webhooks.";
           document.querySelector("#integrationTypeBadge").textContent = "API";
           document.querySelector("#integrationStatusBadge").textContent = "Sin seleccionar";
+          document.querySelector("#revokeIntegration").disabled = true;
+          document.querySelector("#deleteIntegration").disabled = true;
           document.querySelector("#integrationTabBody").innerHTML = `<div class="warehouse-row"><strong>Sin integracion seleccionada</strong><div class="muted">Usa el formulario para conectar tu primera tienda o courier.</div></div>`;
         }
         return;
@@ -3927,6 +3951,7 @@
       document.querySelector("#integrationStatusBadge").textContent = integration.connected ? "activa" : "revocada";
       document.querySelector("#integrationStatusBadge").className = `badge ${integration.connected ? "ok" : "danger"}`;
       document.querySelector("#revokeIntegration").disabled = !integration.connected;
+      document.querySelector("#deleteIntegration").disabled = false;
       document.querySelectorAll("[data-integration-tab]").forEach(button => button.classList.toggle("active", button.dataset.integrationTab === selectedIntegrationTab));
       renderIntegrationTab(integration);
     }
@@ -6041,6 +6066,29 @@ ${orderPayload}</div>
       integration.connected = false;
       addIntegrationLog(integration.id, "integracion.revocada", "La integracion fue revocada manualmente.", "warn");
       renderIntegrations();
+      renderReports();
+      saveState();
+    });
+
+    document.querySelector("#deleteIntegration").addEventListener("click", async () => {
+      const integration = findIntegration(selectedIntegrationId);
+      if (!integration) return;
+      const confirmed = confirm(`Eliminar la integracion "${integration.name}"? Tambien se eliminaran sus API keys, webhooks y logs locales.`);
+      if (!confirmed) return;
+      if (backendOnline && authToken) {
+        try {
+          await apiFetch("/api/integration-delete", {
+            method: "POST",
+            body: JSON.stringify({ integrationId: integration.id })
+          });
+        } catch (error) {
+          alert(`No se pudo eliminar en servidor: ${error.message}`);
+          return;
+        }
+      }
+      deleteIntegrationById(integration.id);
+      renderIntegrations();
+      renderCouriers();
       renderReports();
       saveState();
     });
