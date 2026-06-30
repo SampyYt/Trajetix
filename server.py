@@ -491,6 +491,19 @@ class TrajetixHandler(SimpleHTTPRequestHandler):
         if path == "/api/health":
             json_response(self, 200, {"ok": True, "database": str(DB_PATH)})
             return
+        if path == "/api/external/ping":
+            api_key = authenticate_api_key(self)
+            if not api_key:
+                json_response(self, 401, {"error": "API key invalida o revocada"})
+                return
+            json_response(self, 200, {
+                "ok": True,
+                "company_id": api_key["company_id"],
+                "integration_id": api_key.get("integration_id", ""),
+                "provider": api_key.get("provider", ""),
+                "message": "Conexion externa Trajetix activa"
+            })
+            return
         if path == "/api/public-track":
             guide = parse_qs(parsed.query).get("guide", [""])[0]
             with connect_db() as conn:

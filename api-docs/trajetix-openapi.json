@@ -1,0 +1,124 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Trajetix External API",
+    "version": "1.0.0",
+    "description": "API para conectar ecommerce, Shopify, ERPs y sistemas externos con Trajetix."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Servidor actual de Trajetix"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "TrajetixApiKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "tjx_live"
+      }
+    },
+    "schemas": {
+      "ExternalOrder": {
+        "type": "object",
+        "required": ["customer", "phone", "city", "address"],
+        "properties": {
+          "customer": { "type": "string", "example": "Juan Perez" },
+          "customerId": { "type": "string", "example": "0912345678" },
+          "phone": { "type": "string", "example": "0999999999" },
+          "city": { "type": "string", "example": "Guayaquil" },
+          "sector": { "type": "string", "example": "Centro" },
+          "address": { "type": "string", "example": "Av. Principal y Calle 2" },
+          "reference": { "type": "string", "example": "Casa azul" },
+          "sku": { "type": "string", "example": "SKU-001" },
+          "courier": { "type": "string", "example": "Trajetix" },
+          "payment": { "type": "string", "enum": ["COD", "Sin recaudo"], "example": "COD" },
+          "amount": { "type": "number", "format": "float", "example": 25.0 }
+        }
+      },
+      "GuideCreated": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "guide": { "type": "string", "example": "TJX-17900000001234" },
+          "tracking_url": { "type": "string", "example": "/#track=TJX-17900000001234" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/external/ping": {
+      "get": {
+        "summary": "Probar API key externa",
+        "security": [{ "TrajetixApiKey": [] }],
+        "responses": {
+          "200": { "description": "Conexion activa" },
+          "401": { "description": "API key invalida o revocada" }
+        }
+      }
+    },
+    "/api/external/orders": {
+      "post": {
+        "summary": "Crear guia desde ecommerce o sistema externo",
+        "security": [{ "TrajetixApiKey": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ExternalOrder" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Guia creada",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GuideCreated" }
+              }
+            }
+          },
+          "400": { "description": "Datos incompletos" },
+          "401": { "description": "API key invalida o revocada" }
+        }
+      }
+    },
+    "/api/webhooks/shopify/orders": {
+      "post": {
+        "summary": "Recibir order creation de Shopify",
+        "security": [{ "TrajetixApiKey": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Orden Shopify convertida a guia Trajetix" },
+          "401": { "description": "API key invalida o revocada" }
+        }
+      }
+    },
+    "/api/public-track": {
+      "get": {
+        "summary": "Consultar tracking publico por guia",
+        "parameters": [
+          {
+            "name": "guide",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "example": "TJX-17900000001234"
+          }
+        ],
+        "responses": {
+          "200": { "description": "Estado de la guia" },
+          "404": { "description": "Guia no encontrada" }
+        }
+      }
+    }
+  }
+}

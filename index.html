@@ -3921,18 +3921,7 @@
       }
       if (selectedIntegrationTab === "docs") {
         const baseUrl = `${location.origin}`;
-        body.innerHTML = `
-          <div class="doc-row">
-            <strong>Autenticacion</strong>
-            <div class="muted">Usa el header Authorization con una API key activa.</div>
-            <div class="code-block">Authorization: Bearer tjx_live_xxxxxxxxx</div>
-          </div>
-          <div class="doc-row">
-            <strong>Crear una guia desde Shopify o sistema externo</strong>
-            <div class="code-block">POST ${baseUrl}/api/external/orders
-Content-Type: application/json
-
-{
+        const orderPayload = `{
   "customer": "Juan Perez",
   "phone": "0999999999",
   "city": "Guayaquil",
@@ -3940,20 +3929,61 @@ Content-Type: application/json
   "sku": "SKU-001",
   "payment": "COD",
   "amount": 25.00
-}</div>
+}`;
+        const curlExample = `curl -X POST "${baseUrl}/api/external/orders" \\
+  -H "Authorization: Bearer TU_API_KEY_TRAJETIX" \\
+  -H "Content-Type: application/json" \\
+  -d '${orderPayload}'`;
+        const jsExample = `await fetch("${baseUrl}/api/external/orders", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer TU_API_KEY_TRAJETIX",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify(${orderPayload})
+});`;
+        body.innerHTML = `
+          <div class="doc-row">
+            <strong>Autenticacion</strong>
+            <div class="muted">Primero genera una API Key en esta integracion. El token completo se muestra una sola vez por seguridad.</div>
+            <div class="code-block">Authorization: Bearer tjx_live_xxxxxxxxx</div>
+            <button class="btn" type="button" data-copy="Authorization: Bearer TU_API_KEY_TRAJETIX">Copiar header</button>
+          </div>
+          <div class="doc-row">
+            <strong>Probar conexion</strong>
+            <div class="muted">Antes de conectar Shopify, prueba que la key este activa.</div>
+            <div class="code-block">GET ${baseUrl}/api/external/ping</div>
+            <button class="btn" type="button" data-copy="curl -H &quot;Authorization: Bearer TU_API_KEY_TRAJETIX&quot; &quot;${baseUrl}/api/external/ping&quot;">Copiar prueba cURL</button>
+          </div>
+          <div class="doc-row">
+            <strong>Crear una guia desde Shopify o sistema externo</strong>
+            <div class="code-block">POST ${baseUrl}/api/external/orders
+Content-Type: application/json
+
+${orderPayload}</div>
+            <button class="btn" type="button" data-copy="${curlExample.replaceAll('"', "&quot;")}">Copiar cURL</button>
+            <button class="btn" type="button" data-copy="${jsExample.replaceAll('"', "&quot;")}">Copiar JavaScript</button>
           </div>
           <div class="doc-row">
             <strong>Webhook Shopify orders/create</strong>
-            <div class="muted">Cuando tengas tu app privada o webhook de Shopify, apunta el evento de orden creada a este endpoint.</div>
+            <div class="muted">En Shopify ve a Settings > Notifications > Webhooks, crea el evento Order creation y apunta al endpoint. Usa la API Key Trajetix como Bearer token en tu middleware o app privada.</div>
             <div class="code-block">POST ${baseUrl}/api/webhooks/shopify/orders</div>
+            <button class="btn" type="button" data-copy="${baseUrl}/api/webhooks/shopify/orders">Copiar URL Shopify</button>
           </div>
           <div class="doc-row">
             <strong>Tracking publico</strong>
             <div class="code-block">GET ${baseUrl}/api/public-track?guide=TJX-000001</div>
+            <button class="btn" type="button" data-copy="${baseUrl}/#track=TJX-000001">Copiar link cliente</button>
+          </div>
+          <div class="doc-row">
+            <strong>OpenAPI para desarrolladores</strong>
+            <div class="muted">Importa este archivo en Postman, Insomnia o Swagger para implementar mas rapido.</div>
+            <div class="code-block">${baseUrl}/api-docs/trajetix-openapi.json</div>
+            <button class="btn" type="button" data-copy="${baseUrl}/api-docs/trajetix-openapi.json">Copiar URL OpenAPI</button>
           </div>
           <div class="doc-row">
             <strong>Transportadoras Ecuador</strong>
-            <div class="muted">Para Laar Courier y Servientrega deja guardado URL base, token y secreto. Cuando te entreguen la API, se conecta desde esta misma integracion sin cambiar el flujo de guias.</div>
+            <div class="muted">Para Laar Courier y Servientrega guarda URL base, token y secreto en esta integracion. Cuando te entreguen la API, solo se conecta el adaptador del courier; tus guias, tracking, manifiestos y COD siguen usando el mismo flujo Trajetix.</div>
           </div>
         `;
       }
